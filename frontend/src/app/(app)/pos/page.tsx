@@ -18,6 +18,7 @@ import {
   StickyNote,
   Trash2,
   Undo2,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -307,6 +308,7 @@ function POS() {
   if (loadingOrder && !order) return <Spinner />;
 
   const activeLines = order?.items ?? [];
+  const voidedTotal = activeLines.filter((i) => i.status === "cancelled").reduce((sum, i) => sum + i.line_total, 0);
   const lineCount = activeLines.filter((i) => i.status !== "cancelled").length + draft.length;
 
   return (
@@ -470,7 +472,14 @@ function POS() {
                     {l.cancel_reason && <span className="text-red-500">{l.cancel_reason}</span>}
                   </div>
                 </div>
-                <div className="text-right text-sm font-medium">{money(l.line_total, false)}</div>
+                {l.status === "cancelled" ? (
+                  <div className="text-right text-sm">
+                    <div className="text-slate-400 line-through">{money(l.line_total, false)}</div>
+                    <div className="text-[10px] font-semibold uppercase text-red-500">void · not charged</div>
+                  </div>
+                ) : (
+                  <div className="text-right text-sm font-medium">{money(l.line_total, false)}</div>
+                )}
                 {editable && l.status === "new" && (
                   <div className="flex items-center gap-0.5">
                     <button
@@ -532,13 +541,43 @@ function POS() {
 
         {/* totals */}
         <div className="border-t border-slate-200 p-3 text-sm">
+          {voidedTotal > 0 && <Row label="Voided items (excluded)" value={money(voidedTotal)} className="text-xs text-slate-400" />}
           <Row label="Subtotal" value={money(totals.subtotal)} />
           {totals.discount > 0 && <Row label={`Discount${order?.discount_type === "percent" ? ` (${order.discount_value}%)` : ""}`} value={`- ${money(totals.discount)}`} className="text-emerald-600" />}
           {totals.service > 0 && <Row label={`Service charge (${settings?.service_charge_rate}%)`} value={money(totals.service)} />}
           {totals.tax > 0 && <Row label={`Tax (${settings?.tax_rate}%)`} value={money(totals.tax)} />}
           {totals.delivery > 0 && <Row label="Delivery fee" value={money(totals.delivery)} />}
           <Row label="Total" value={money(totals.total)} className="mt-1 border-t border-dashed border-slate-200 pt-1 text-lg font-bold" />
-          {totals.paid > 0 && <Row label="Paid" value={money(totals.paid)} className="text-emerald-600" />}
+          {order && order.payments.length > 0 && (
+            <div className="mt-1 space-y-0.5">
+              {order.payments.map((p) => (
+                <div key={p.id} className="flex items-center justify-between text-emerald-700">
+                  <span>
+                    Paid ({p.method}){p.reference && ` · ${p.reference}`}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    {money(p.amount)}
+                    {editable && canCash && (
+                      <button
+                        className="rounded p-0.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        title="Remove / refund this payment"
+                        disabled={busy}
+                        onClick={async () => {
+                          if (!(await confirm({ title: `Remove ${p.method} payment of ${money(p.amount)}?`, message: "Use this to correct a payment or to refund the customer.", confirmText: "Remove payment", danger: true }))) return;
+                          await run(() => api.del<Order>(`/orders/${order.id}/payments/${p.id}`), "Payment removed");
+                        }}
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {order && order.status === "open" && totals.paid > totals.total + 0.004 && (
+            <Row label="Refund due to customer" value={money(totals.paid - totals.total)} className="font-semibold text-red-600" />
+          )}
           {order && order.status === "open" && totals.paid > 0 && <Row label="Balance" value={money(Math.max(totals.total - totals.paid, 0))} className="font-semibold" />}
         </div>
 

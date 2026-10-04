@@ -158,3 +158,25 @@ def test_role_permissions(client, admin, setup_data):
     assert z.status_code == 200 and any(r["line"] == "Expected cash in drawer (excl. opening float)" for r in z.json()["rows"])
     assert client.get("/api/reports/daily-sales", headers=cash).status_code == 403
     assert client.get("/api/users", headers=kit).status_code == 403
+
+
+def test_void_after_payment_requires_refund(client, admin, setup_data):
+    d = setup_data
+    order = client.post("/api/orders", headers=admin, json={
+        "order_type": "takeaway", "send_to_kitchen": True,
+        "items": [{"menu_item_id": d["burger"]["id"], "quantity": 1}, {"menu_item_id": d["fries"]["id"], "quantity": 1}],
+    }).json()
+    full = order["total"]
+    order = client.post(f"/api/orders/{order['id']}/payments", headers=admin, json={"method": "cash", "amount": full}).json()
+    fries = next(i for i in order["items"] if i["name"] == "Fries")
+    order = client.post(f"/api/orders/{order['id']}/items/{fries['id']}/void", headers=admin, json={"reason": "Wrong item"}).json()
+    # total drops (fries no longer charged) while the payment stays
+    assert order["subtotal"] == 500 and order["total"] < full
+    assert order["balance_due"] == 0
+    r = client.post(f"/api/orders/{order['id']}/complete", headers=admin)
+    assert r.status_code == 400 and "exceed" in r.json()["detail"]
+    pay = order["payments"][0]
+    order = client.delete(f"/api/orders/{order['id']}/payments/{pay['id']}", headers=admin).json()
+    order = client.post(f"/api/orders/{order['id']}/complete", headers=admin,
+                        json={"payments": [{"method": "cash", "amount": order["total"]}]}).json()
+    assert order["status"] == "completed" and order["paid_amount"] == order["total"]

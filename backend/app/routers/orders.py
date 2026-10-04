@@ -479,6 +479,14 @@ def _complete(db: Session, order: Order) -> None:
         raise HTTPException(status_code=400, detail="Order has no items. Cancel it instead.")
     if balance_due(order) > 0:
         raise HTTPException(status_code=400, detail=f"Balance due: {balance_due(order)}. Collect payment first.")
+    overpaid = q2(Decimal(order.paid_amount) - Decimal(order.total))
+    if overpaid > 0:
+        # happens when items are voided after payment: refund before closing so sales are not overstated
+        raise HTTPException(
+            status_code=400,
+            detail=f"Payments exceed the bill by {overpaid} (items were voided after payment). "
+            "Remove or reduce a payment to refund the customer, then close the order.",
+        )
     _send_to_kitchen(order)  # quick-service: anything not yet fired goes to the kitchen now
     order.status = "completed"
     order.completed_at = now()
