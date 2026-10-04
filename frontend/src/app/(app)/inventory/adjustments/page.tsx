@@ -3,9 +3,11 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { AsyncButton, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, useToast } from "@/components/ui";
+import ExportButton from "@/components/ExportButton";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { dateOnly, daysAgo, isoDate, money, qty, titleCase } from "@/lib/format";
+import { adjustmentsSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { Adjustment, InventoryItem } from "@/lib/types";
 
@@ -62,7 +64,7 @@ export default function AdjustmentsPage() {
       <PageHeader
         title="Stock Adjustments & Wastage"
         subtitle={`${data?.length ?? 0} entries · ${money(-loss)} written off`}
-        actions={<button className="btn-primary" onClick={() => setForm({ item_id: "", location: isKitchen ? "kitchen" : "store", reason: "wastage", quantity: "", unit_cost: "", notes: "", date: isoDate() })}><Plus size={16} /> New adjustment</button>}
+        actions={<><ExportButton filename="Stock_adjustments" sheets={() => adjustmentsSheets(data ?? [])} disabled={!data?.length} /><button className="btn-primary" onClick={() => setForm({ item_id: "", location: isKitchen ? "kitchen" : "store", reason: "wastage", quantity: "", unit_cost: "", notes: "", date: isoDate() })}><Plus size={16} /> New adjustment</button></>}
       />
       <div className="card mb-4 flex flex-wrap gap-3 p-3">
         <input className="input w-auto" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="From" />

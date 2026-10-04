@@ -5,8 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import LineEditor, { EditableLine, validLines } from "@/components/LineEditor";
 import { Empty, ErrorBox, Field, Modal, PageHeader, Spinner, useToast } from "@/components/ui";
+import ExportButton from "@/components/ExportButton";
 import { api } from "@/lib/api";
 import { dateOnly, daysAgo, isoDate, money, qty } from "@/lib/format";
+import { issuesSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { InventoryItem, StockIssue } from "@/lib/types";
 
@@ -66,7 +68,7 @@ function Issues() {
 
   return (
     <div>
-      <PageHeader title="Store → Kitchen Issues" subtitle={`${data?.length ?? 0} issues · ${money(total)} issued`} actions={<button className="btn-primary" onClick={openNew}><Plus size={16} /> New issue</button>} />
+      <PageHeader title="Store → Kitchen Issues" subtitle={`${data?.length ?? 0} issues · ${money(total)} issued`} actions={<><ExportButton filename="Kitchen_issues" sheets={() => issuesSheets(data ?? [])} disabled={!data?.length} /><button className="btn-primary" onClick={openNew}><Plus size={16} /> New issue</button></>} />
       <div className="card mb-4 flex flex-wrap gap-3 p-3">
         <input className="input w-auto" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="From" />
         <input className="input w-auto" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} aria-label="To" />

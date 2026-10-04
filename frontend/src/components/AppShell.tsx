@@ -9,6 +9,7 @@ import {
   Boxes,
   ChefHat,
   ClipboardList,
+  DatabaseBackup,
   History,
   LayoutDashboard,
   LayoutGrid,
@@ -82,6 +83,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     section: "Admin",
     items: [
       { href: "/users", label: "Users", icon: UserCog, roles: [] },
+      { href: "/backup", label: "Backup & Restore", icon: DatabaseBackup, roles: [] },
       { href: "/settings", label: "Settings", icon: Settings, roles: ["manager"] },
     ],
   },
@@ -147,7 +149,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <X size={18} />
           </button>
         </div>
-        <nav className="flex-1 overflow-y-auto px-3 py-3">
+        <nav className="scrollbar-dark flex-1 overflow-y-auto px-3 py-3">
           {sections.map((s) => (
             <div key={s.section} className="mb-4">
               <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{s.section}</div>

@@ -4,8 +4,10 @@ import clsx from "clsx";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AsyncButton, Badge, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useConfirm, useToast } from "@/components/ui";
+import ExportButton from "@/components/ExportButton";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
+import { menuSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { MenuCategory, MenuItem } from "@/lib/types";
 
@@ -93,6 +95,7 @@ export default function MenuPage() {
         subtitle="Categories, items, prices and availability"
         actions={
           <>
+            <ExportButton filename="Menu" sheets={() => menuSheets(items ?? [])} disabled={!items?.length} />
             <button className="btn-secondary" onClick={() => setCatForm({ name: "", sort_order: (categories?.length ?? 0) + 1, is_active: true })}><Plus size={16} /> Category</button>
             <button className="btn-primary" disabled={!categories?.length} onClick={() => setItem(newItem())}><Plus size={16} /> Menu item</button>
           </>

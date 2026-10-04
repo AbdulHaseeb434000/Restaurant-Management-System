@@ -3,8 +3,10 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AsyncButton, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useConfirm, useToast } from "@/components/ui";
+import ExportButton from "@/components/ExportButton";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
+import { suppliersSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { Supplier } from "@/lib/types";
 
@@ -44,7 +46,7 @@ export default function SuppliersPage() {
 
   return (
     <div>
-      <PageHeader title="Suppliers" subtitle="Vendors you purchase ingredients from" actions={<button className="btn-primary" onClick={() => setForm({ ...EMPTY })}><Plus size={16} /> Add supplier</button>} />
+      <PageHeader title="Suppliers" subtitle="Vendors you purchase ingredients from" actions={<><ExportButton filename="Suppliers" sheets={() => suppliersSheets(data ?? [])} disabled={!data?.length} /><button className="btn-primary" onClick={() => setForm({ ...EMPTY })}><Plus size={16} /> Add supplier</button></>} />
       <ErrorBox message={error} />
       <div className="card overflow-x-auto">
         {!data ? <Spinner /> : data.length === 0 ? <Empty /> : (

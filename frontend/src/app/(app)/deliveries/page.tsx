@@ -4,8 +4,10 @@ import { Bike, CheckCircle2, Eye, MapPin, Phone } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Empty, ErrorBox, Field, Modal, PageHeader, Spinner, StatusBadge, useToast } from "@/components/ui";
+import ExportButton from "@/components/ExportButton";
 import { api } from "@/lib/api";
 import { isoDate, minutesSince, money, timeOnly } from "@/lib/format";
+import { ordersSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { OrderListItem } from "@/lib/types";
 
@@ -51,7 +53,7 @@ export default function DeliveriesPage() {
 
   return (
     <div>
-      <PageHeader title="Deliveries" subtitle="Track delivery orders from kitchen to doorstep" actions={<Link href="/pos?type=delivery" className="btn-primary"><Bike size={16} /> New delivery</Link>} />
+      <PageHeader title="Deliveries" subtitle="Track delivery orders from kitchen to doorstep" actions={<><ExportButton filename="Deliveries" sheets={() => ordersSheets(list ?? [])} disabled={!list?.length} /><Link href="/pos?type=delivery" className="btn-primary"><Bike size={16} /> New delivery</Link></>} />
       <ErrorBox message={error} />
       {!list && <Spinner />}
       <div className="grid gap-4 lg:grid-cols-3">

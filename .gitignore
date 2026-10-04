@@ -10,3 +10,5 @@ out/
 *.log
 .DS_Store
 *.tsbuildinfo
+backups/
+.backups-test/

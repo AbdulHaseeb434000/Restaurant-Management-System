@@ -23,6 +23,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - backups:/app/backups
     ports:
       - "8111:8111"
 
@@ -38,3 +40,4 @@ services:
 
 volumes:
   pgdata:
+  backups:

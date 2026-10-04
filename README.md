@@ -58,6 +58,32 @@ An order can only be completed once it is fully paid. Items that have been sent 
 
 ---
 
+### Data safety & export
+- **Export to Excel** on every screen that lists data (orders, customers, menu, tables, deliveries, stock, items, purchases with their lines, issues with their lines, adjustments, ledger, suppliers, expenses, users, the dashboard and every report). Files are real `.xlsx` with typed numbers and dates, frozen headers and filters.
+- **Backup & Restore** (admin, sidebar → Admin). *Download backup* gives one `.rmsbak` file with all data; keep it on a USB drive or cloud storage. *Choose backup file* restores it, for example on a new PC. A restore replaces all data in a single transaction, and a safety backup of the current data is written first, so it can be undone.
+- **Automatic backups** are written to the `backups` folder every 24 hours (newest 14 kept; see `BACKUP_*` settings). They are listed on the Backup page, where you can download or restore them.
+
+## Windows one-click install (no Docker)
+
+For running the app natively on the restaurant's Windows 10/11 PC:
+
+1. Copy or clone this folder to the PC, e.g. `C:\RestaurantManager` (avoid OneDrive-synced folders).
+2. Double-click **`INSTALL-Windows.bat`**. It needs internet the first time (about 250 MB) and takes 5-10 minutes. It asks for:
+   - the business timezone,
+   - whether to load demo data,
+   - the first admin password,
+   - whether to start the app automatically when Windows starts.
+3. Double-click the **Restaurant Manager** desktop shortcut (or `START-Windows.bat`). The browser opens at http://localhost:3111.
+4. To stop, use **Stop Restaurant Manager** (or `STOP-Windows.bat`).
+
+How it works:
+- **Self-contained:** everything is portable and lives in the `runtime\` folder: Node.js, Python (via `uv`) and PostgreSQL 16, which runs on port **5433** so it never clashes with another PostgreSQL. No admin rights are needed. The one exception is a missing Microsoft Visual C++ runtime, which the installer installs after a Windows permission prompt.
+- **Generated settings:** the installer creates `backend\.env` with a random database password and secret key.
+- **Other devices:** tablets and phones on the same Wi-Fi can open `http://<PC-IP>:3111`; `START-Windows.bat` prints the address. Allow it when Windows Firewall asks.
+- **Logs** are in `runtime\logs`, and automatic backups go to the `backups\` folder.
+- **Updating:** stop the app, replace the code files (keep `runtime\`, `backups\` and `backend\.env`), then run `INSTALL-Windows.bat` again. Data and settings are kept and database migrations run automatically.
+- **Your data** lives in `runtime\pgdata`. Don't delete the `runtime\` folder unless you have a backup.
+
 ## Quick start (Docker)
 
 ```bash
@@ -128,6 +154,9 @@ The tests cover the full dine-in flow (KOTs, partial and full voids, discounts, 
 | `TIMEZONE` | `Asia/Karachi` | Business day and hour boundaries for reports and the dashboard |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / `admin123` | First admin (only created when there are no users) |
 | `SEED_DEMO_DATA` | `true` | Load demo data into an empty DB |
+| `BACKUP_DIR` | `backups` (inside `backend/`) | Folder for automatic / server-side backups |
+| `BACKUP_INTERVAL_HOURS` | `24` | Automatic backup interval (`0` turns it off) |
+| `BACKUP_KEEP` | `14` | How many automatic backups to keep |
 | `CORS_ORIGINS` | `http://localhost:3111` | Only needed if the API is called cross-origin |
 
 ## Project layout

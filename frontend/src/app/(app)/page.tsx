@@ -3,6 +3,7 @@
 import { AlertTriangle, ChefHat, CircleDollarSign, LayoutGrid, Receipt, ShoppingBag, Truck, Users } from "lucide-react";
 import Link from "next/link";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import ExportButton from "@/components/ExportButton";
 import { ErrorBox, PageHeader, Spinner, StatCard } from "@/components/ui";
 import { money, ORDER_TYPE_LABEL, titleCase } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
@@ -43,9 +44,58 @@ export default function DashboardPage() {
         title="Dashboard"
         subtitle={`Today, ${new Date(`${data.date}T00:00:00`).toDateString()}`}
         actions={
+          <>
+            <ExportButton
+              filename="Dashboard"
+              sheets={() => [
+                {
+                  name: "Today",
+                  rows: [
+                    ["Date", data.date],
+                    ["Sales today", data.sales_today],
+                    ["Completed orders", data.orders_today],
+                    ["Average order value", data.avg_order_value],
+                    ["Dine-in covers", data.guests_today],
+                    ["Open orders", data.open_orders],
+                    ["Open orders value", data.open_orders_value],
+                    ["Cancelled orders", data.cancelled_today],
+                    ["Tables occupied", `${data.tables.occupied} / ${data.tables.total}`],
+                    ["Kitchen queue (items)", data.kitchen_pending],
+                    ["Active deliveries", data.pending_deliveries],
+                    ["Low stock items", data.low_stock],
+                    ["Expenses today", data.expenses_today],
+                    ...Object.entries(data.by_type).map(([k, v]) => [`Sales - ${ORDER_TYPE_LABEL[k] ?? k}`, v.total]),
+                    ...Object.entries(data.payments).map(([k, v]) => [`Collected - ${titleCase(k)}`, v]),
+                  ] as [string, string | number][],
+                  columns: [
+                    { header: "Metric", value: (r: [string, string | number]) => r[0] },
+                    { header: "Value", value: (r: [string, string | number]) => r[1] },
+                  ],
+                },
+                {
+                  name: "Last 7 days",
+                  rows: data.trend,
+                  columns: [
+                    { header: "Date", value: (r: Dashboard["trend"][number]) => r.date, type: "date" },
+                    { header: "Orders", value: (r: Dashboard["trend"][number]) => r.orders, type: "number" },
+                    { header: "Sales", value: (r: Dashboard["trend"][number]) => r.total, type: "money" },
+                  ],
+                },
+                {
+                  name: "Top items today",
+                  rows: data.top_items,
+                  columns: [
+                    { header: "Item", value: (r: Dashboard["top_items"][number]) => r.item },
+                    { header: "Qty", value: (r: Dashboard["top_items"][number]) => r.qty, type: "number" },
+                    { header: "Revenue", value: (r: Dashboard["top_items"][number]) => r.revenue, type: "money" },
+                  ],
+                },
+              ]}
+            />
           <Link href="/pos" className="btn-primary">
             <ShoppingBag size={16} /> New Order
           </Link>
+          </>
         }
       />
 

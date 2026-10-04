@@ -3,8 +3,10 @@
 import { Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { AsyncButton, Badge, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useToast } from "@/components/ui";
+import ExportButton from "@/components/ExportButton";
 import { api } from "@/lib/api";
 import { dateOnly } from "@/lib/format";
+import { usersSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { Role, User } from "@/lib/types";
 
@@ -42,7 +44,7 @@ export default function UsersPage() {
 
   return (
     <div>
-      <PageHeader title="Users & Roles" subtitle="Staff accounts and what they can access" actions={<button className="btn-primary" onClick={() => setForm({ username: "", full_name: "", password: "", role: "cashier", is_active: true })}><Plus size={16} /> Add user</button>} />
+      <PageHeader title="Users & Roles" subtitle="Staff accounts and what they can access" actions={<><ExportButton filename="Users" sheets={() => usersSheets(data ?? [])} disabled={!data?.length} /><button className="btn-primary" onClick={() => setForm({ username: "", full_name: "", password: "", role: "cashier", is_active: true })}><Plus size={16} /> Add user</button></>} />
       <ErrorBox message={error} />
       <div className="card overflow-x-auto">
         {!data ? <Spinner /> : data.length === 0 ? <Empty /> : (

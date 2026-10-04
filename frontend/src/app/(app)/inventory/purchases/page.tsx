@@ -5,8 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import LineEditor, { EditableLine, validLines } from "@/components/LineEditor";
 import { Empty, ErrorBox, Field, Modal, PageHeader, PromptDialog, Spinner, StatusBadge, useToast } from "@/components/ui";
+import ExportButton from "@/components/ExportButton";
 import { api } from "@/lib/api";
 import { dateOnly, daysAgo, isoDate, money, qty } from "@/lib/format";
+import { purchasesSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { InventoryItem, Purchase, Supplier } from "@/lib/types";
 
@@ -46,7 +48,7 @@ function Purchases() {
       <PageHeader
         title="Purchases (Goods Received)"
         subtitle={`${data?.length ?? 0} purchases · ${money(total)} total · ${money(due)} unpaid`}
-        actions={<button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> New purchase</button>}
+        actions={<><ExportButton filename="Purchases" sheets={() => purchasesSheets(data ?? [])} disabled={!data?.length} /><button className="btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> New purchase</button></>}
       />
       <div className="card mb-4 flex flex-wrap gap-3 p-3">
         <input className="input w-auto" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="From" />

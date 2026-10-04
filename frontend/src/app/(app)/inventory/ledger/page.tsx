@@ -2,8 +2,10 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import ExportButton from "@/components/ExportButton";
 import { Empty, ErrorBox, PageHeader, Spinner } from "@/components/ui";
 import { dateOnly, daysAgo, isoDate, money, qty, titleCase } from "@/lib/format";
+import { ledgerSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { InventoryItem, Movement } from "@/lib/types";
 
@@ -27,7 +29,7 @@ function Ledger() {
 
   return (
     <div>
-      <PageHeader title="Stock Ledger" subtitle="Every stock movement in and out of the store and kitchen" />
+      <PageHeader actions={<ExportButton filename="Stock_ledger" sheets={() => ledgerSheets(data ?? [])} disabled={!data?.length} />} title="Stock Ledger" subtitle="Every stock movement in and out of the store and kitchen" />
       <div className="card mb-4 grid gap-3 p-3 sm:grid-cols-3 lg:grid-cols-5">
         <select className="input" value={itemId} onChange={(e) => setItemId(e.target.value)} aria-label="Item">
           <option value="">All items</option>

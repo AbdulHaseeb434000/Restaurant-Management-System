@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     timezone: str = "Asia/Karachi"
     admin_username: str = "admin"
     admin_password: str = "admin123"
+    # Automatic backups: written to backup_dir every backup_interval_hours (0 = off), newest backup_keep kept
+    backup_dir: str = "backups"
+    backup_interval_hours: float = 24
+    backup_keep: int = 14
 
 
 settings = Settings()

@@ -4,9 +4,11 @@ import { AlertTriangle, Boxes, ChefHat, Warehouse } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
+import ExportButton from "@/components/ExportButton";
 import { Empty, ErrorBox, PageHeader, Spinner, StatCard, StatusBadge, Toggle } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { money, qty } from "@/lib/format";
+import { stockSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { InventoryItem, Named } from "@/lib/types";
 
@@ -46,12 +48,15 @@ function Stock() {
         title="Stock Overview"
         subtitle="Current store & kitchen stock at weighted-average cost"
         actions={
-          isStore && (
+          <>
+            <ExportButton filename="Stock" sheets={() => stockSheets(data ?? [])} disabled={!data?.length} />
+            {isStore && (
             <>
               <Link href="/inventory/purchases?new=1" className="btn-primary">New purchase</Link>
               <Link href="/inventory/issues?new=1" className="btn-secondary">Issue to kitchen</Link>
             </>
-          )
+          )}
+          </>
         }
       />
       <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

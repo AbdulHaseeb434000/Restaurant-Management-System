@@ -3,9 +3,11 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AsyncButton, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, useConfirm, useToast } from "@/components/ui";
+import ExportButton from "@/components/ExportButton";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { dateOnly, money } from "@/lib/format";
+import { customersSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { Customer } from "@/lib/types";
 
@@ -46,7 +48,7 @@ export default function CustomersPage() {
 
   return (
     <div>
-      <PageHeader title="Customers" subtitle="Customer directory for take-away and delivery" actions={<button className="btn-primary" onClick={() => setEdit({ ...EMPTY })}><Plus size={16} /> Add customer</button>} />
+      <PageHeader title="Customers" subtitle="Customer directory for take-away and delivery" actions={<><ExportButton filename="Customers" sheets={() => customersSheets(data ?? [])} disabled={!data?.length} /><button className="btn-primary" onClick={() => setEdit({ ...EMPTY })}><Plus size={16} /> Add customer</button></>} />
       <input className="input mb-4 max-w-sm" placeholder="Search name or phone" value={search} onChange={(e) => setSearch(e.target.value)} />
       <ErrorBox message={error} />
       <div className="card overflow-x-auto">

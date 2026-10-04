@@ -3,8 +3,10 @@
 import { Pencil, Plus, Ruler, Tags, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AsyncButton, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useConfirm, useToast } from "@/components/ui";
+import ExportButton from "@/components/ExportButton";
 import { api } from "@/lib/api";
 import { money, qty } from "@/lib/format";
+import { stockSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { InventoryItem, Named, Unit } from "@/lib/types";
 
@@ -68,6 +70,7 @@ export default function InventoryItemsPage() {
         subtitle="Raw materials kept in store and issued to the kitchen"
         actions={
           <>
+            <ExportButton filename="Inventory_items" sheets={() => stockSheets(data ?? [])} disabled={!data?.length} />
             <button className="btn-secondary" onClick={() => setMastersOpen("units")}><Ruler size={16} /> Units</button>
             <button className="btn-secondary" onClick={() => setMastersOpen("cats")}><Tags size={16} /> Categories</button>
             <button className="btn-primary" onClick={() => setForm({ name: "", sku: "", category_id: "", unit_id: units?.[0]?.id ?? "", reorder_level: "0", is_active: true })}><Plus size={16} /> New item</button>

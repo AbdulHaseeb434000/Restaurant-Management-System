@@ -5,6 +5,8 @@ os.environ.setdefault(
     os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg2://postgres:postgres@localhost:5432/restaurant_test"),
 )
 os.environ["SEED_DEMO_DATA"] = "false"
+os.environ["BACKUP_INTERVAL_HOURS"] = "0"
+os.environ["BACKUP_DIR"] = os.path.join(os.path.dirname(__file__), ".backups-test")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

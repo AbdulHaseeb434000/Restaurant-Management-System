@@ -3,8 +3,10 @@
 import { Pencil, Plus, Tags, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AsyncButton, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, useConfirm, useToast } from "@/components/ui";
+import ExportButton from "@/components/ExportButton";
 import { api } from "@/lib/api";
 import { dateOnly, isoDate, money, titleCase } from "@/lib/format";
+import { expensesSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { Expense, Named } from "@/lib/types";
 
@@ -58,6 +60,7 @@ export default function ExpensesPage() {
         subtitle={`${data?.length ?? 0} entries · ${money(total)}`}
         actions={
           <>
+            <ExportButton filename="Expenses" sheets={() => expensesSheets(data ?? [])} disabled={!data?.length} />
             <button className="btn-secondary" onClick={() => setCatsOpen(true)}><Tags size={16} /> Categories</button>
             <button className="btn-primary" onClick={() => setForm({ expense_date: isoDate(), category_id: "", amount: "", paid_to: "", payment_method: "cash", notes: "" })}><Plus size={16} /> Add expense</button>
           </>

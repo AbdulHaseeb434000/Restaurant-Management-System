@@ -5,9 +5,11 @@ import { Clock, Pencil, Plus, Settings2, Trash2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AsyncButton, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, StatusBadge, Toggle, useConfirm, useToast } from "@/components/ui";
+import ExportButton from "@/components/ExportButton";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { minutesSince, money } from "@/lib/format";
+import { tablesSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { Area, DiningTable } from "@/lib/types";
 
@@ -107,11 +109,14 @@ export default function TablesPage() {
         title="Tables"
         subtitle={`${counts.available} available · ${counts.occupied} occupied · ${counts.reserved} reserved · ${counts.cleaning} cleaning`}
         actions={
-          isManager && (
+          <>
+            <ExportButton filename="Tables" sheets={() => tablesSheets(tables ?? [])} disabled={!tables?.length} />
+            {isManager && (
             <button className={manage ? "btn-primary" : "btn-secondary"} onClick={() => setManage(!manage)}>
               <Settings2 size={16} /> {manage ? "Done" : "Manage tables"}
             </button>
-          )
+          )}
+          </>
         }
       />
       <ErrorBox message={error} />

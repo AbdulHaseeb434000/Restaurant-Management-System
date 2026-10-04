@@ -60,7 +60,9 @@ async function request<T>(method: string, path: string, body?: unknown, params?:
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   let payload: BodyInit | undefined;
-  if (body instanceof URLSearchParams) {
+  if (body instanceof FormData) {
+    payload = body; // browser sets the multipart boundary header
+  } else if (body instanceof URLSearchParams) {
     payload = body;
     headers["Content-Type"] = "application/x-www-form-urlencoded";
   } else if (body !== undefined) {
@@ -86,7 +88,37 @@ async function request<T>(method: string, path: string, body?: unknown, params?:
   return data as T;
 }
 
+/** GET a file (with auth) and return it as a Blob plus the server-suggested file name. */
+async function download(path: string): Promise<{ blob: Blob; filename: string }> {
+  const token = getToken();
+  const res = await fetch(buildUrl(path), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) {
+    let data: unknown = null;
+    try {
+      data = await res.json();
+    } catch {
+      /* not json */
+    }
+    throw new ApiError(res.status, errorMessage(data, `Download failed (${res.status})`));
+  }
+  const cd = res.headers.get("content-disposition") ?? "";
+  const filename = /filename="?([^";]+)"?/.exec(cd)?.[1] ?? "download";
+  return { blob: await res.blob(), filename };
+}
+
+export function saveBlob(blob: Blob, filename: string) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 export const api = {
+  download,
+  upload: <T>(path: string, form: FormData) => request<T>("POST", path, form),
   get: <T>(path: string, params?: Params) => request<T>("GET", path, undefined, params),
   post: <T>(path: string, body?: unknown, params?: Params) => request<T>("POST", path, body, params),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),

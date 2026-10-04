@@ -20,9 +20,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import ExportButton from "@/components/ExportButton";
 import { Empty, ErrorBox, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { dateOnly, dateTime, daysAgo, isoDate, money, qty } from "@/lib/format";
+import { reportSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
 import type { ReportColumn, ReportResult } from "@/lib/types";
 
@@ -120,6 +122,7 @@ export default function ReportPage() {
         subtitle={data?.description}
         actions={
           <>
+            {data && <ExportButton filename={data.title} sheets={() => reportSheets(data)} disabled={!data.rows.length} />}
             <button className="btn-secondary" onClick={exportCsv} disabled={!data?.rows.length}><Download size={16} /> CSV</button>
             <button className="btn-secondary" onClick={() => window.print()}><Printer size={16} /> Print</button>
           </>

@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Loader2, X } from "lucide-react";
+import { Loader2, Minus, Plus, X } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 // ------------------------------------------------------------------ toast
@@ -25,13 +25,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={push}>
       {children}
-      <div className="no-print fixed bottom-4 right-4 z-[100] flex w-80 flex-col gap-2">
+      {/* top-centre and click-through so toasts never cover action buttons (e.g. POS Pay) */}
+      <div className="no-print pointer-events-none fixed left-1/2 top-3 z-[100] flex w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-2">
         {toasts.map((t) => (
           <div
             key={t.id}
             role="status"
+            onClick={() => setToasts((all) => all.filter((x) => x.id !== t.id))}
             className={clsx(
-              "rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg",
+              "pointer-events-auto cursor-pointer rounded-lg px-4 py-3 text-center text-sm font-medium text-white shadow-lg",
               t.kind === "success" && "bg-emerald-600",
               t.kind === "error" && "bg-red-600",
               t.kind === "info" && "bg-slate-800",
@@ -389,6 +391,47 @@ export function StatCard({
         <div className="mt-1 truncate text-xl font-bold text-slate-900">{value}</div>
         {sub && <div className="mt-0.5 text-xs text-slate-500">{sub}</div>}
       </div>
+    </div>
+  );
+}
+
+/** Touch-friendly number input with large -/+ buttons (native spinners are tiny and unreliable). */
+export function NumberStepper({
+  value,
+  onChange,
+  min = 1,
+  max = 999,
+  label,
+  className,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  label?: string;
+  className?: string;
+}) {
+  const clamp = (v: number) => Math.min(max, Math.max(min, v));
+  return (
+    <div className={clsx("inline-flex items-stretch overflow-hidden rounded-lg border border-slate-300 bg-white", className)}>
+      <button type="button" className="px-3 text-slate-600 hover:bg-slate-100 active:bg-slate-200 disabled:opacity-40" disabled={value <= min} onClick={() => onChange(clamp(value - 1))} aria-label={`Decrease ${label ?? ""}`.trim()}>
+        <Minus size={16} />
+      </button>
+      <input
+        type="text"
+        inputMode="numeric"
+        className="w-12 border-x border-slate-300 py-2 text-center text-sm font-semibold focus:outline-none"
+        value={value}
+        aria-label={label}
+        onChange={(e) => {
+          const n = parseInt(e.target.value.replace(/\D/g, ""), 10);
+          onChange(clamp(Number.isNaN(n) ? min : n));
+        }}
+        onFocus={(e) => e.target.select()}
+      />
+      <button type="button" className="px-3 text-slate-600 hover:bg-slate-100 active:bg-slate-200 disabled:opacity-40" disabled={value >= max} onClick={() => onChange(clamp(value + 1))} aria-label={`Increase ${label ?? ""}`.trim()}>
+        <Plus size={16} />
+      </button>
     </div>
   );
 }

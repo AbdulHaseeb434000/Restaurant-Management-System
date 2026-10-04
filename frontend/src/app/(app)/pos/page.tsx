@@ -6,6 +6,7 @@ import {
   Ban,
   ChefHat,
   CreditCard,
+  LayoutGrid,
   ListOrdered,
   Minus,
   Percent,
@@ -22,7 +23,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PaymentModal from "@/components/PaymentModal";
-import { Badge, Field, Modal, PromptDialog, Spinner, StatusBadge, useConfirm, usePageTitle, useToast } from "@/components/ui";
+import { Badge, Field, Modal, NumberStepper, PromptDialog, Spinner, StatusBadge, useConfirm, usePageTitle, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { minutesSince, money, ORDER_TYPE_LABEL } from "@/lib/format";
@@ -88,6 +89,7 @@ function POS() {
   const { data: tables, reload: reloadTables } = useApi<DiningTable[]>("/tables");
   const { data: openOrders, reload: reloadOpen } = useApi<OrderListItem[]>("/orders", { status: "open", limit: 200 }, { refreshMs: 20000 });
   const [openListOpen, setOpenListOpen] = useState(false);
+  const [tablePickerOpen, setTablePickerOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const loadOrder = useCallback(async (id: string | number) => {
@@ -156,7 +158,8 @@ function POS() {
     return m;
   }, [order, draft]);
 
-  const freeTables = (tables ?? []).filter((t) => !t.open_order_id || t.open_order_id === order?.id);
+  const selectedTable = (tables ?? []).find((t) => t.id === tableId) ?? null;
+
 
   // ------------------------------------------------------------------ totals preview
   const totals = useMemo(() => {
@@ -421,15 +424,15 @@ function POS() {
               </div>
               {orderType === "dine_in" && (
                 <div className="flex gap-2">
-                  <select className="input" value={tableId ?? ""} onChange={(e) => setTableId(e.target.value ? Number(e.target.value) : null)} aria-label="Table">
-                    <option value="">Select table…</option>
-                    {freeTables.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({t.area_name ?? "-"}, {t.capacity} seats){t.status !== "available" ? ` - ${t.status}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <input className="input w-20" type="number" min={1} value={guests} onChange={(e) => setGuests(Math.max(1, Number(e.target.value)))} aria-label="Guests" title="Guests" />
+                  <button
+                    type="button"
+                    className={clsx("btn flex-1 justify-start border py-2.5", selectedTable ? "border-brand-400 bg-brand-50 text-brand-800" : "border-dashed border-slate-400 text-slate-500 hover:bg-slate-50")}
+                    onClick={() => setTablePickerOpen(true)}
+                  >
+                    <LayoutGrid size={16} />
+                    {selectedTable ? `Table ${selectedTable.name} · ${selectedTable.capacity} seats` : "Tap to choose a table"}
+                  </button>
+                  <NumberStepper value={guests} onChange={setGuests} min={1} max={99} label="guests" />
                 </div>
               )}
               {orderType !== "dine_in" && (
@@ -611,6 +614,46 @@ function POS() {
       </section>
 
       {/* ================================================= DIALOGS */}
+      <Modal open={tablePickerOpen} onClose={() => setTablePickerOpen(false)} title="Choose a table" size="xl">
+        {!tables ? (
+          <Spinner />
+        ) : (
+          Array.from(new Set(tables.map((t) => t.area_name ?? "Other"))).map((area) => (
+            <div key={area} className="mb-4">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{area}</div>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-7">
+                {tables
+                  .filter((t) => (t.area_name ?? "Other") === area)
+                  .map((t) => {
+                    const busy = !!t.open_order_id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setTableId(t.id);
+                          setGuests((g) => Math.min(g, t.capacity + 4));
+                          setTablePickerOpen(false);
+                        }}
+                        className={clsx(
+                          "flex h-20 flex-col items-center justify-center rounded-xl border-2 text-sm transition active:scale-95",
+                          busy && "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400",
+                          !busy && t.id === tableId && "border-brand-500 bg-brand-100",
+                          !busy && t.id !== tableId && t.status === "available" && "border-emerald-300 bg-emerald-50 hover:bg-emerald-100",
+                          !busy && t.id !== tableId && t.status !== "available" && "border-amber-300 bg-amber-50 hover:bg-amber-100",
+                        )}
+                      >
+                        <span className="text-lg font-bold">{t.name}</span>
+                        <span className="text-xs">{busy ? "occupied" : t.status === "available" ? `${t.capacity} seats` : t.status}</span>
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          ))
+        )}
+      </Modal>
       <Modal open={openListOpen} onClose={() => setOpenListOpen(false)} title={`Open orders (${openOrders?.length ?? 0})`} size="lg">
         {!openOrders?.length ? (
           <p className="p-6 text-center text-sm text-slate-400">No open orders.</p>
@@ -843,7 +886,7 @@ function VoidDialog({ line, onClose, onConfirm }: { line: OrderItem | null; onCl
       <p className="mb-3 text-sm text-slate-600">This item was already sent to the kitchen. Voided items are kept for the cancellation report.</p>
       {line && line.quantity > 1 && (
         <Field label={`Quantity to void (of ${line.quantity})`} className="mb-3">
-          <input className="input" type="number" min={1} max={line.quantity} value={qty} onChange={(e) => setQty(Math.min(line.quantity, Math.max(1, Number(e.target.value) || 1)))} />
+          <NumberStepper value={qty} onChange={setQty} min={1} max={line.quantity} label="quantity to void" />
         </Field>
       )}
       <Field label="Reason">
@@ -927,7 +970,7 @@ function DetailsDialog({
         )}
         {order?.order_type === "dine_in" && (
           <Field label="Guests">
-            <input className="input" type="number" min={1} value={v.guests} onChange={(e) => setV({ ...v, guests: Math.max(1, Number(e.target.value)) })} />
+            <NumberStepper value={v.guests} onChange={(g) => setV({ ...v, guests: g })} min={1} max={99} label="guests" />
           </Field>
         )}
         <Field label="Order notes (kitchen)">
