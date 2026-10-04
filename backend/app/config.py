@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/restaurant"
     secret_key: str = "change-me-in-production"
     access_token_expire_minutes: int = 60 * 12
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    cors_origins: str = "http://localhost:3111,http://127.0.0.1:3111"
     seed_demo_data: bool = True
     # Business timezone: used for "today" and for grouping sales by day/hour in reports
     timezone: str = "Asia/Karachi"

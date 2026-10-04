@@ -63,8 +63,8 @@ An order can only be completed once it is fully paid. Items that have been sent 
 ```bash
 docker compose up --build
 ```
-- App: http://localhost:3000
-- API docs (Swagger): http://localhost:8000/docs
+- App: http://localhost:3111
+- API docs (Swagger): http://localhost:8111/docs
 
 On first start the backend creates the tables. It loads demo data (menu, 17 tables, 35 ingredients, 5 suppliers, about 30 days of orders, purchases and issues) into an **empty** database. Set `SEED_DEMO_DATA=false` for a clean install; only the admin user, settings, units and expense categories are created then.
 
@@ -91,14 +91,14 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env          # edit DATABASE_URL / SECRET_KEY / TIMEZONE
 createdb restaurant           # PostgreSQL must be running
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8111
 ```
 
 ### Frontend
 ```bash
 cd frontend
 npm install
-BACKEND_URL=http://localhost:8000 npm run dev    # http://localhost:3000
+BACKEND_URL=http://localhost:8111 npm run dev    # http://localhost:3111
 ```
 The browser only talks to `/api/*` on the Next.js origin, and Next proxies those calls to FastAPI (`next.config.mjs`), so no CORS setup is needed.
 
@@ -120,7 +120,7 @@ The tests cover the full dine-in flow (KOTs, partial and full voids, discounts, 
 | `TIMEZONE` | `Asia/Karachi` | Business day and hour boundaries for reports and the dashboard |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / `admin123` | First admin (only created when there are no users) |
 | `SEED_DEMO_DATA` | `true` | Load demo data into an empty DB |
-| `CORS_ORIGINS` | `http://localhost:3000` | Only needed if the API is called cross-origin |
+| `CORS_ORIGINS` | `http://localhost:3111` | Only needed if the API is called cross-origin |
 
 ## Project layout
 ```

@@ -24,17 +24,17 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "8111:8111"
 
   frontend:
     build:
       context: ./frontend
       args:
-        BACKEND_URL: http://backend:8000
+        BACKEND_URL: http://backend:8111
     depends_on:
       - backend
     ports:
-      - "3000:3000"
+      - "3111:3111"
 
 volumes:
   pgdata:
