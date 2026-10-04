@@ -24,7 +24,17 @@ export default function ReceiptPage() {
   if (error) return <p className="p-6 text-red-600">{error}</p>;
   if (!order || !settings) return <Spinner />;
 
-  const items = order.items.filter((i) => i.status !== "cancelled");
+  // consolidate identical lines that were fired in separate KOTs
+  const grouped = new Map<string, { key: string; name: string; unit_price: number; quantity: number; line_total: number }>();
+  for (const i of order.items) {
+    if (i.status === "cancelled") continue;
+    const key = `${i.menu_item_id}-${i.unit_price}`;
+    const g = grouped.get(key) ?? { key, name: i.name, unit_price: i.unit_price, quantity: 0, line_total: 0 };
+    g.quantity += i.quantity;
+    g.line_total += i.line_total;
+    grouped.set(key, g);
+  }
+  const items = Array.from(grouped.values());
   return (
     <div className="mx-auto w-[300px] p-3 font-mono text-[12px] leading-snug text-black">
       <div className="text-center">
@@ -58,7 +68,7 @@ export default function ReceiptPage() {
         </thead>
         <tbody>
           {items.map((i) => (
-            <tr key={i.id}>
+            <tr key={i.key}>
               <td className="pr-1 align-top">
                 {i.name}
                 <div className="text-[10px]">@ {money(i.unit_price, false)}</div>

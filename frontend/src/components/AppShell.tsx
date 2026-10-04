@@ -108,7 +108,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
 
-  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    setOpen(false);
+    document.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [pathname, user]);
 
   if (loading || !user) return <Spinner className="h-screen" />;
 
@@ -150,6 +153,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    data-active={active}
                     className={clsx(
                       "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm",
                       active ? "bg-brand-600 text-white" : "hover:bg-slate-800 hover:text-white",

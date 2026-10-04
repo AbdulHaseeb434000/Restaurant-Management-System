@@ -49,6 +49,17 @@ def test_dine_in_full_flow(client, admin, setup_data):
     assert r.status_code == 400
     order = client.post(f"/api/orders/{order['id']}/items/{fries_line['id']}/void", headers=admin, json={"reason": "Wrong item"}).json()
     assert order["subtotal"] == 1500
+    # partial void: 1 of 3 burgers
+    burger_line = order["items"][0]
+    r = client.post(f"/api/orders/{order['id']}/items/{burger_line['id']}/void", headers=admin, json={"reason": "x", "quantity": 5})
+    assert r.status_code == 400
+    order = client.post(f"/api/orders/{order['id']}/items/{burger_line['id']}/void", headers=admin, json={"reason": "Dropped", "quantity": 1}).json()
+    assert order["subtotal"] == 1000
+    assert order["items"][0]["quantity"] == 2 and order["items"][0]["status"] == "sent"
+    assert order["items"][-1]["quantity"] == 1 and order["items"][-1]["status"] == "cancelled"
+    # add burger back so the remaining assertions keep their totals
+    order = client.post(f"/api/orders/{order['id']}/items", headers=admin, json={"items": [{"menu_item_id": d["burger"]["id"], "quantity": 1}], "send_to_kitchen": True}).json()
+    assert order["subtotal"] == 1500
 
     # kitchen marks ticket ready
     r = client.patch(f"/api/kitchen/tickets/{order['id']}/1", headers=admin, json={"status": "ready"})

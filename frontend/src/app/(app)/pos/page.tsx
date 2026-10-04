@@ -475,7 +475,7 @@ function POS() {
                   disabled={busy || (!draft.length && !order?.items.some((i) => i.status === "new"))}
                   onClick={() => save(true)}
                 >
-                  <ChefHat size={16} /> Send to Kitchen
+                  <ChefHat size={16} /> <span className="whitespace-nowrap">Send to Kitchen</span>
                 </button>
               </div>
               {canCash && (
@@ -592,16 +592,12 @@ function POS() {
           }
         }}
       />
-      <PromptDialog
-        open={!!voidLine}
-        title={`Void ${voidLine?.quantity} × ${voidLine?.name}`}
-        message="This item was already sent to the kitchen. Give a reason for voiding it."
-        requireText
-        danger
-        confirmText="Void Item"
+      <VoidDialog
+        key={voidLine?.id ?? "none"}
+        line={voidLine}
         onClose={() => setVoidLine(null)}
-        onConfirm={async (reason) => {
-          const o = await run(() => api.post<Order>(`/orders/${order!.id}/items/${voidLine!.id}/void`, { reason }), "Item voided");
+        onConfirm={async (reason, quantity) => {
+          const o = await run(() => api.post<Order>(`/orders/${order!.id}/items/${voidLine!.id}/void`, { reason, quantity }), "Item voided");
           if (o) setVoidLine(null);
         }}
       />
@@ -708,6 +704,51 @@ function DiscountDialog({
             ))}
           </div>
         )}
+      </div>
+    </Modal>
+  );
+}
+
+function VoidDialog({ line, onClose, onConfirm }: { line: OrderItem | null; onClose: () => void; onConfirm: (reason: string, qty: number) => Promise<void> }) {
+  // remounted per line via `key`, so initial state comes straight from the line
+  const [reason, setReason] = useState("");
+  const [qty, setQty] = useState(line?.quantity ?? 1);
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await onConfirm(reason.trim(), qty);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      open={!!line}
+      onClose={onClose}
+      title={`Void ${line?.name ?? ""}`}
+      size="sm"
+      footer={
+        <button className="btn-danger" disabled={busy || !reason.trim()} onClick={submit}>
+          Void {qty} item{qty > 1 ? "s" : ""}
+        </button>
+      }
+    >
+      <p className="mb-3 text-sm text-slate-600">This item was already sent to the kitchen. Voided items are kept for the cancellation report.</p>
+      {line && line.quantity > 1 && (
+        <Field label={`Quantity to void (of ${line.quantity})`} className="mb-3">
+          <input className="input" type="number" min={1} max={line.quantity} value={qty} onChange={(e) => setQty(Math.min(line.quantity, Math.max(1, Number(e.target.value) || 1)))} />
+        </Field>
+      )}
+      <Field label="Reason">
+        <input className="input" autoFocus value={reason} onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => e.key === "Enter" && reason.trim() && submit()} />
+      </Field>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {["Customer changed mind", "Wrong item punched", "Out of stock", "Quality issue"].map((r) => (
+          <button key={r} className="btn-secondary btn-sm" onClick={() => setReason(r)}>
+            {r}
+          </button>
+        ))}
       </div>
     </Modal>
   );

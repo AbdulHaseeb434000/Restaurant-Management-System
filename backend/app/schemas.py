@@ -202,6 +202,10 @@ class CancelIn(BaseModel):
     reason: str = Field(min_length=1, max_length=255)
 
 
+class VoidIn(CancelIn):
+    quantity: int | None = Field(default=None, ge=1)  # partial void; default = whole line
+
+
 class DiscountIn(BaseModel):
     discount_type: Literal["amount", "percent"]
     discount_value: NonNegNum

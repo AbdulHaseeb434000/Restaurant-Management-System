@@ -114,7 +114,7 @@ def seed(db: Session, demo: bool = True) -> None:
                           service_charge_rate=Decimal("5"), default_delivery_fee=Decimal("150"),
                           receipt_footer="Thank you for dining with us! Please visit again."))
     if not db.scalar(select(func.count(User.id))):
-        db.add(User(username=settings.admin_username, full_name="Administrator",
+        db.add(User(username=settings.admin_username.strip().lower(), full_name="Administrator",
                     password_hash=hash_password(settings.admin_password), role="admin"))
     if not db.scalar(select(func.count(Unit.id))):
         db.add_all(Unit(name=n, abbreviation=a) for n, a in UNITS)
@@ -199,7 +199,7 @@ def seed_demo(db: Session) -> None:
         if d % 3 == 0:
             by_supplier: dict[int, list[tuple[InventoryItem, Decimal, Decimal]]] = {}
             for item, price in inv:
-                qty = Decimal(int(Decimal(item.reorder_level) * Decimal(rng.uniform(1.2, 2.2))) + 1)
+                qty = Decimal(int(Decimal(item.reorder_level) * Decimal(rng.uniform(0.8, 1.3))) + 1)
                 cost = q2(Decimal(price) * Decimal(rng.uniform(0.94, 1.08)))
                 by_supplier.setdefault(supplier_for(item).id, []).append((item, qty, cost))
             for sup in suppliers:
@@ -231,7 +231,7 @@ def seed_demo(db: Session) -> None:
         total = Decimal(0)
         for idx, (item, _) in enumerate(inv):
             avail = Decimal(item.store_qty)
-            want = (Decimal(item.reorder_level) * Decimal(rng.uniform(0.35, 0.6))).quantize(Decimal("1"))
+            want = (Decimal(item.reorder_level) * Decimal(rng.uniform(0.22, 0.34))).quantize(Decimal("1"))
             if d == 0 and idx % 8 == 0:
                 # leave a few items below reorder level so the low-stock screens have something to show
                 want = max(avail - (Decimal(item.reorder_level) * Decimal("0.6")).quantize(Decimal("1")), want)

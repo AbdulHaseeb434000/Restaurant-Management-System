@@ -24,6 +24,7 @@ from ..schemas import (
     PayAndCloseIn,
     PaymentIn,
     TransferIn,
+    VoidIn,
 )
 from ..security import CASHIERS, FRONT_OF_HOUSE, KITCHEN, MANAGERS, get_current_user, require_roles
 from ..services import balance_due, recalc_order
@@ -362,7 +363,7 @@ def remove_item(
 def void_item(
     order_id: int,
     item_id: int,
-    data: CancelIn,
+    data: VoidIn,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles(*CASHIERS)),
 ):
@@ -371,8 +372,23 @@ def void_item(
     line = _get_line(order, item_id)
     if line.status == "cancelled":
         raise HTTPException(status_code=400, detail="Item is already cancelled")
-    line.status = "cancelled"
-    line.cancel_reason = data.reason
+    qty = data.quantity or line.quantity
+    if qty > line.quantity:
+        raise HTTPException(status_code=400, detail=f"Only {line.quantity} on this line")
+    if qty < line.quantity:
+        # split: keep the remaining quantity active and record the voided part as its own line
+        line.quantity -= qty
+        line.line_total = q2(line.unit_price * line.quantity)
+        order.items.append(
+            OrderItem(
+                menu_item_id=line.menu_item_id, name=line.name, category_name=line.category_name, quantity=qty,
+                unit_price=line.unit_price, line_total=q2(line.unit_price * qty), notes=line.notes,
+                status="cancelled", kot_no=line.kot_no, sent_at=line.sent_at, cancel_reason=data.reason,
+            )
+        )
+    else:
+        line.status = "cancelled"
+        line.cancel_reason = data.reason
     return _finish(db, order)
 
 

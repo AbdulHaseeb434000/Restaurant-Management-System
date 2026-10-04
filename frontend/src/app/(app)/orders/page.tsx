@@ -20,7 +20,8 @@ export default function OrdersPage() {
   const [search, setSearch] = useState("");
   const { data, error, reload } = useApi<OrderListItem[]>(
     "/orders",
-    { status, order_type: orderType, date_from: dateFrom, date_to: dateTo, search, limit: 500 },
+    // open orders are shown regardless of date so nothing gets forgotten from a previous shift
+    { status, order_type: orderType, date_from: status === "open" ? undefined : dateFrom, date_to: status === "open" ? undefined : dateTo, search, limit: 500 },
     { refreshMs: 20000 },
   );
 
@@ -55,8 +56,8 @@ export default function OrdersPage() {
           <option value="takeaway">Take-away</option>
           <option value="delivery">Delivery</option>
         </select>
-        <input className="input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="From" />
-        <input className="input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} aria-label="To" />
+        <input className="input" type="date" disabled={status === "open"} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="From" />
+        <input className="input" type="date" disabled={status === "open"} value={dateTo} onChange={(e) => setDateTo(e.target.value)} aria-label="To" />
       </div>
       <ErrorBox message={error} />
       <div className="card overflow-x-auto">

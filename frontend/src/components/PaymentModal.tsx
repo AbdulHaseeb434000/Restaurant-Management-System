@@ -46,7 +46,7 @@ export default function PaymentModal({
     }
   }, [open, order]);
 
-  const entered = useMemo(() => round2(rows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0)), [rows]);
+  const entered = useMemo(() => round2(rows.reduce((s, r) => s + Math.max(parseFloat(r.amount) || 0, 0), 0)), [rows]);
   const remaining = round2(due - entered);
   const cashAmount = rows.filter((r) => r.method === "cash").reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
   const change = tendered ? round2((parseFloat(tendered) || 0) - cashAmount) : 0;
@@ -59,6 +59,10 @@ export default function PaymentModal({
 
   const submit = async () => {
     if (!order) return;
+    if (rows.some((r) => (parseFloat(r.amount) || 0) < 0)) {
+      toast("Payment amounts cannot be negative", "error");
+      return;
+    }
     if (Math.abs(remaining) > 0.004) {
       toast(remaining > 0 ? `Still ${money(remaining)} remaining` : `Payments exceed due by ${money(-remaining)}`, "error");
       return;
