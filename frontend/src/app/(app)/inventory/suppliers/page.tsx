@@ -2,7 +2,7 @@
 
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useToast } from "@/components/ui";
+import { AsyncButton, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useConfirm, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
@@ -13,6 +13,7 @@ const EMPTY: Form = { name: "", contact_person: "", phone: "", email: "", addres
 
 export default function SuppliersPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { data, error, reload } = useApi<Supplier[]>("/inventory/suppliers", { include_inactive: true });
   const [form, setForm] = useState<Form | null>(null);
 
@@ -31,7 +32,7 @@ export default function SuppliersPage() {
   };
 
   const remove = async (s: Supplier) => {
-    if (!confirm(`Delete ${s.name}? Suppliers with purchases are deactivated instead.`)) return;
+    if (!(await confirm({ title: `Delete ${s.name}?`, message: "Suppliers with purchases are deactivated instead.", confirmText: "Delete", danger: true }))) return;
     try {
       await api.del(`/inventory/suppliers/${s.id}`);
       toast("Supplier removed");
@@ -68,7 +69,7 @@ export default function SuppliersPage() {
           </table>
         )}
       </div>
-      <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Edit supplier" : "Add supplier"} footer={<button className="btn-primary" onClick={save}>Save</button>}>
+      <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Edit supplier" : "Add supplier"} footer={<AsyncButton onClick={save}>Save</AsyncButton>}>
         {form && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Name" className="sm:col-span-2"><input className="input" autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>

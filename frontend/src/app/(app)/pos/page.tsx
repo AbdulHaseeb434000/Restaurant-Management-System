@@ -6,6 +6,7 @@ import {
   Ban,
   ChefHat,
   CreditCard,
+  ListOrdered,
   Minus,
   Percent,
   Plus,
@@ -19,14 +20,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PaymentModal from "@/components/PaymentModal";
-import { Badge, Field, Modal, PromptDialog, Spinner, StatusBadge, useToast } from "@/components/ui";
+import { Badge, Field, Modal, PromptDialog, Spinner, StatusBadge, useConfirm, usePageTitle, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { money, ORDER_TYPE_LABEL } from "@/lib/format";
+import { minutesSince, money, ORDER_TYPE_LABEL } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
-import type { Customer, DiningTable, MenuCategory, MenuItem, Order, OrderItem, OrderType } from "@/lib/types";
+import type { Customer, DiningTable, MenuCategory, MenuItem, Order, OrderItem, OrderListItem, OrderType } from "@/lib/types";
 
 interface DraftLine {
   key: string;
@@ -51,6 +52,7 @@ function POS() {
   const params = useSearchParams();
   const router = useRouter();
   const toast = useToast();
+  const confirm = useConfirm();
   const { settings, hasRole } = useAuth();
   const canCash = hasRole("manager", "cashier");
 
@@ -84,6 +86,9 @@ function POS() {
   const { data: categories } = useApi<MenuCategory[]>("/menu/categories");
   const { data: menu } = useApi<MenuItem[]>("/menu/items");
   const { data: tables, reload: reloadTables } = useApi<DiningTable[]>("/tables");
+  const { data: openOrders, reload: reloadOpen } = useApi<OrderListItem[]>("/orders", { status: "open", limit: 200 }, { refreshMs: 20000 });
+  const [openListOpen, setOpenListOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const loadOrder = useCallback(async (id: string | number) => {
     setLoadingOrder(true);
@@ -102,6 +107,33 @@ function POS() {
     else setOrder(null);
   }, [orderId, loadOrder]);
 
+  usePageTitle(order ? `POS · ${order.order_no}` : "POS");
+
+  // keyboard: "/" or F2 focuses menu search, Esc clears it
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName);
+      if ((e.key === "/" && !typing) || e.key === "F2") {
+        e.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // warn before closing the tab with items that were never saved
+  useEffect(() => {
+    if (!draft.length) return;
+    const onUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
+  }, [draft.length]);
+
   const type: OrderType = order?.order_type ?? orderType;
   const editable = !order || order.status === "open";
 
@@ -115,6 +147,14 @@ function POS() {
         (!q || m.name.toLowerCase().includes(q) || (m.code ?? "").toLowerCase().includes(q)),
     );
   }, [menu, category, search, type]);
+
+  // quantity already on this order per menu item, shown as a badge on the menu tile
+  const inCart = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const i of order?.items ?? []) if (i.status !== "cancelled") m.set(i.menu_item_id, (m.get(i.menu_item_id) ?? 0) + i.quantity);
+    for (const l of draft) m.set(l.menu_item_id, (m.get(l.menu_item_id) ?? 0) + l.quantity);
+    return m;
+  }, [order, draft]);
 
   const freeTables = (tables ?? []).filter((t) => !t.open_order_id || t.open_order_id === order?.id);
 
@@ -156,6 +196,7 @@ function POS() {
     try {
       const o = await fn();
       setOrder(o);
+      reloadOpen();
       if (success) toast(success);
       return o;
     } catch (e) {
@@ -214,6 +255,7 @@ function POS() {
       setDraft([]);
       router.replace(`/pos?order=${o.id}`);
       reloadTables();
+      reloadOpen();
     }
     return o;
   };
@@ -223,7 +265,18 @@ function POS() {
     if (o) setPayOpen(true);
   };
 
-  const newOrder = () => {
+  const discardDraftOk = async () =>
+    !draft.length ||
+    (await confirm({ title: "Discard unsaved items?", message: `${draft.length} item line(s) were not saved to the order.`, confirmText: "Discard", danger: true }));
+
+  const goToOrder = async (id: number) => {
+    if (!(await discardDraftOk())) return;
+    setOpenListOpen(false);
+    router.push(`/pos?order=${id}`);
+  };
+
+  const newOrder = async () => {
+    if (!(await discardDraftOk())) return;
     setDraft([]);
     setOrder(null);
     setCustomerName("");
@@ -233,6 +286,7 @@ function POS() {
     setTableId(null);
     router.replace("/pos");
     reloadTables();
+    reloadOpen();
   };
 
   const lookupCustomer = async () => {
@@ -260,8 +314,25 @@ function POS() {
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input className="input pl-9" placeholder="Search menu by name or code…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input
+                ref={searchRef}
+                className="input pl-9"
+                placeholder="Search menu by name or code…  ( / )"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setSearch("");
+                  if (e.key === "Enter" && visibleMenu.length === 1) {
+                    addToDraft(visibleMenu[0]);
+                    setSearch("");
+                  }
+                }}
+              />
             </div>
+            <button className="btn-secondary whitespace-nowrap" onClick={() => setOpenListOpen(true)} title="Open / held orders">
+              <ListOrdered size={16} /> Open
+              <span className="rounded-full bg-brand-100 px-1.5 text-xs font-bold text-brand-700">{openOrders?.length ?? 0}</span>
+            </button>
             <button className="btn-secondary" onClick={newOrder}>
               <Plus size={16} /> New
             </button>
@@ -289,11 +360,17 @@ function POS() {
               onClick={() => addToDraft(m)}
               disabled={!editable || !m.is_available}
               className={clsx(
-                "card flex h-24 flex-col justify-between p-3 text-left transition hover:border-brand-400 hover:shadow-md disabled:cursor-not-allowed",
+                "card relative flex h-24 flex-col justify-between p-3 text-left transition hover:border-brand-400 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed",
                 !m.is_available && "opacity-50",
+                inCart.has(m.id) && "border-brand-300 bg-brand-50/40",
               )}
             >
-              <span className="line-clamp-2 text-sm font-medium leading-tight">{m.name}</span>
+              {inCart.has(m.id) && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-brand-600 px-1.5 text-xs font-bold text-white shadow">
+                  {inCart.get(m.id)}
+                </span>
+              )}
+              <span className="line-clamp-2 pr-2 text-sm font-medium leading-tight">{m.name}</span>
               <span className="flex items-center justify-between text-sm">
                 <span className="font-bold text-brand-700">{money(m.price)}</span>
                 {!m.is_available && <Badge color="red">86</Badge>}
@@ -534,6 +611,34 @@ function POS() {
       </section>
 
       {/* ================================================= DIALOGS */}
+      <Modal open={openListOpen} onClose={() => setOpenListOpen(false)} title={`Open orders (${openOrders?.length ?? 0})`} size="lg">
+        {!openOrders?.length ? (
+          <p className="p-6 text-center text-sm text-slate-400">No open orders.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {openOrders.map((o) => (
+              <li key={o.id}>
+                <button
+                  className={clsx("flex w-full items-center gap-3 px-2 py-2.5 text-left hover:bg-slate-50", o.id === order?.id && "bg-brand-50")}
+                  onClick={() => goToOrder(o.id)}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium">
+                      {o.table_name ? `Table ${o.table_name}` : o.customer_name || o.customer_phone || ORDER_TYPE_LABEL[o.order_type]}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {o.order_no} · {ORDER_TYPE_LABEL[o.order_type]} · {o.item_count} items · {minutesSince(o.created_at)} min
+                      {o.created_by_name && ` · ${o.created_by_name}`}
+                    </div>
+                  </div>
+                  {o.paid_amount > 0 && <Badge color="green">PART PAID</Badge>}
+                  <span className="font-semibold">{money(o.total)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Modal>
       <PaymentModal
         open={payOpen}
         order={order}
@@ -542,6 +647,7 @@ function POS() {
           setOrder(o);
           setPayOpen(false);
           reloadTables();
+          reloadOpen();
           window.open(`/print/receipt/${o.id}`, "_blank");
         }}
       />

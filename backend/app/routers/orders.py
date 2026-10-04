@@ -26,7 +26,14 @@ from ..schemas import (
     TransferIn,
     VoidIn,
 )
-from ..security import CASHIERS, FRONT_OF_HOUSE, KITCHEN, MANAGERS, get_current_user, require_roles
+from ..security import (
+    CASHIERS,
+    FRONT_OF_HOUSE,
+    KITCHEN,
+    MANAGERS,
+    get_current_user,
+    require_roles,
+)
 from ..services import balance_due, recalc_order
 from ..utils import day_range, get_app_settings, get_or_404, q2
 

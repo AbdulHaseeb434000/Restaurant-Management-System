@@ -1,19 +1,47 @@
 "use client";
 
 import clsx from "clsx";
-import { CheckCheck, Flame, HandPlatter, RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Empty, ErrorBox, PageHeader, Spinner, StatusBadge, Toggle, useToast } from "@/components/ui";
+import { Ban, BellOff, BellRing, CheckCheck, Flame, HandPlatter, Maximize, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Empty, ErrorBox, Modal, PageHeader, Spinner, StatusBadge, Toggle, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { minutesSince, ORDER_TYPE_LABEL, timeOnly } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
-import type { KitchenTicket, OrderItem } from "@/lib/types";
+import type { KitchenTicket, MenuItem, OrderItem } from "@/lib/types";
 
 export default function KitchenPage() {
   const toast = useToast();
   const [showReady, setShowReady] = useState(true);
   const { data, error, reload, loading } = useApi<KitchenTicket[]>("/kitchen/tickets", { include_ready: showReady }, { refreshMs: 10000 });
+  const [sound, setSound] = useState(false);
+  const [availOpen, setAvailOpen] = useState(false);
+  const audioRef = useRef<AudioContext | null>(null);
+  const seen = useRef<Set<string> | null>(null);
   const [, tick] = useState(0);
+
+  // chime when a ticket we have not seen before shows up
+  useEffect(() => {
+    if (!data) return;
+    const keys = new Set(data.map((t) => `${t.order_id}-${t.kot_no}`));
+    const isNew = seen.current !== null && [...keys].some((k) => !seen.current!.has(k));
+    seen.current = keys;
+    if (isNew && sound && audioRef.current) chime(audioRef.current);
+  }, [data, sound]);
+
+  const toggleSound = () => {
+    if (!sound) {
+      // audio can only start after a user gesture, so create the context here
+      audioRef.current ??= new AudioContext();
+      audioRef.current.resume();
+      chime(audioRef.current);
+    }
+    setSound(!sound);
+  };
+
+  const fullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen().catch(() => toast("Fullscreen not available", "error"));
+  };
   useEffect(() => {
     const t = setInterval(() => tick((x) => x + 1), 30000);
     return () => clearInterval(t);
@@ -46,6 +74,15 @@ export default function KitchenPage() {
         actions={
           <>
             <Toggle label="Show ready" checked={showReady} onChange={setShowReady} />
+            <button className={sound ? "btn-primary" : "btn-secondary"} onClick={toggleSound} title="Chime on new tickets">
+              {sound ? <BellRing size={16} /> : <BellOff size={16} />} Sound {sound ? "on" : "off"}
+            </button>
+            <button className="btn-secondary" onClick={() => setAvailOpen(true)} title="Mark items sold out">
+              <Ban size={16} /> Sold out
+            </button>
+            <button className="btn-secondary" onClick={fullscreen} title="Fullscreen">
+              <Maximize size={16} />
+            </button>
             <button className="btn-secondary" onClick={reload} disabled={loading}>
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
             </button>
@@ -109,6 +146,65 @@ export default function KitchenPage() {
           })}
         </div>
       )}
+      <AvailabilityModal open={availOpen} onClose={() => setAvailOpen(false)} />
     </div>
   );
+}
+
+/** Quick "86" list: kitchen marks dishes unavailable so the POS stops selling them. */
+function AvailabilityModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const toast = useToast();
+  const { data, reload } = useApi<MenuItem[]>(open ? "/menu/items" : null);
+  const [q, setQ] = useState("");
+  const toggle = async (m: MenuItem) => {
+    try {
+      await api.patch(`/menu/items/${m.id}/availability`, undefined, { is_available: !m.is_available });
+      toast(`${m.name} ${m.is_available ? "marked SOLD OUT" : "available again"}`, m.is_available ? "info" : "success");
+      reload();
+    } catch (e) {
+      toast((e as Error).message, "error");
+    }
+  };
+  const items = (data ?? []).filter((m) => !q || m.name.toLowerCase().includes(q.toLowerCase()));
+  const soldOut = (data ?? []).filter((m) => !m.is_available).length;
+  return (
+    <Modal open={open} onClose={onClose} title={`Menu availability · ${soldOut} sold out`} size="lg">
+      <input className="input mb-3" placeholder="Search dish" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+      {!data ? (
+        <Spinner />
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {items.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => toggle(m)}
+              className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm ${m.is_available ? "border-slate-200 hover:bg-slate-50" : "border-red-300 bg-red-50 text-red-700"}`}
+            >
+              <span>
+                <span className="font-medium">{m.name}</span>
+                <span className="block text-xs text-slate-500">{m.category_name}</span>
+              </span>
+              <span className="text-xs font-bold">{m.is_available ? "AVAILABLE" : "SOLD OUT"}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function chime(ctx: AudioContext) {
+  const now = ctx.currentTime;
+  [880, 1320].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = freq;
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.0001, now + i * 0.18);
+    gain.gain.exponentialRampToValueAtTime(0.3, now + i * 0.18 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.18 + 0.35);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now + i * 0.18);
+    osc.stop(now + i * 0.18 + 0.4);
+  });
 }

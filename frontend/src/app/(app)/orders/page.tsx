@@ -3,7 +3,7 @@
 import { Eye, Printer, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { Empty, ErrorBox, PageHeader, Spinner, StatusBadge, useToast } from "@/components/ui";
+import { Empty, ErrorBox, PageHeader, Spinner, StatusBadge, useConfirm, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { dateTime, isoDate, money, ORDER_TYPE_LABEL } from "@/lib/format";
@@ -12,6 +12,7 @@ import type { OrderListItem } from "@/lib/types";
 
 export default function OrdersPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { hasRole } = useAuth();
   const [status, setStatus] = useState("");
   const [orderType, setOrderType] = useState("");
@@ -26,7 +27,7 @@ export default function OrdersPage() {
   );
 
   const reopen = async (o: OrderListItem) => {
-    if (!confirm(`Reopen ${o.order_no}?`)) return;
+    if (!(await confirm({ title: `Reopen ${o.order_no}?`, message: "The order becomes editable again and its table is re-occupied. Existing payments are kept.", confirmText: "Reopen" }))) return;
     try {
       await api.post(`/orders/${o.id}/reopen`);
       toast(`${o.order_no} reopened`);

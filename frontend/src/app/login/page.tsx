@@ -1,8 +1,9 @@
 "use client";
 
-import { ClipboardList, Loader2 } from "lucide-react";
+import { ClipboardList, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { usePageTitle } from "@/components/ui";
 import { homeFor, useAuth } from "@/lib/auth";
 
 export default function LoginPage() {
@@ -12,6 +13,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  usePageTitle("Sign in");
 
   useEffect(() => {
     if (!loading && user) router.replace(homeFor(user.role));
@@ -49,15 +52,35 @@ export default function LoginPage() {
           </div>
           <div>
             <label className="label" htmlFor="password">Password</label>
-            <input id="password" type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <div className="relative">
+              <input id="password" type={showPw ? "text" : "password"} className="input pr-10" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600" onClick={() => setShowPw(!showPw)} aria-label={showPw ? "Hide password" : "Show password"}>
+                {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
           <button className="btn-primary w-full py-2.5" disabled={busy}>
             {busy && <Loader2 size={16} className="animate-spin" />} Sign in
           </button>
         </div>
-        <p className="mt-6 text-center text-xs text-slate-400">
-          Demo: admin / admin123 · manager / manager123 · cashier / cashier123 · waiter / waiter123 · kitchen / kitchen123 · store / store123
-        </p>
+        <div className="mt-6 border-t border-slate-100 pt-4">
+          <p className="mb-2 text-center text-xs text-slate-400">Demo accounts - click to fill</p>
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {["admin", "manager", "cashier", "waiter", "kitchen", "store"].map((u) => (
+              <button
+                key={u}
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() => {
+                  setUsername(u);
+                  setPassword(`${u}123`);
+                }}
+              >
+                {u}
+              </button>
+            ))}
+          </div>
+        </div>
       </form>
     </div>
   );

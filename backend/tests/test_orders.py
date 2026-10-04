@@ -148,5 +148,13 @@ def test_role_permissions(client, admin, setup_data):
     kit = login(client, "kit1", "secret1")
     assert client.get("/api/kitchen/tickets", headers=kit).status_code == 200
     assert client.post("/api/orders", headers=kit, json={"order_type": "takeaway"}).status_code == 403
-    assert client.get("/api/reports", headers=kit).status_code == 403
+    assert client.get("/api/reports", headers=kit).json() == []
+    assert client.get("/api/reports/daily-sales", headers=kit).status_code == 403
+    assert client.get("/api/reports/day-end", headers=kit).status_code == 403
+    client.post("/api/users", headers=admin, json={"username": "cash1", "full_name": "Cashier One", "password": "secret1", "role": "cashier"})
+    cash = login(client, "cash1", "secret1")
+    assert [r["key"] for r in client.get("/api/reports", headers=cash).json()] == ["day-end"]
+    z = client.get("/api/reports/day-end", headers=cash)
+    assert z.status_code == 200 and any(r["line"] == "Expected cash in drawer (excl. opening float)" for r in z.json()["rows"])
+    assert client.get("/api/reports/daily-sales", headers=cash).status_code == 403
     assert client.get("/api/users", headers=kit).status_code == 403

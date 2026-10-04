@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ToastProvider } from "@/components/ui";
+import { ConfirmProvider, ToastProvider } from "@/components/ui";
 import { AuthProvider } from "@/lib/auth";
 import "./globals.css";
 
@@ -13,7 +13,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <AuthProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            <ConfirmProvider>{children}</ConfirmProvider>
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

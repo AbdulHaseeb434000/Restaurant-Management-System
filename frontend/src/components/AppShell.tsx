@@ -5,6 +5,7 @@ import {
   BarChart3,
   Bike,
   BookOpen,
+  CalendarCheck,
   Boxes,
   ChefHat,
   ClipboardList,
@@ -72,6 +73,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: "Business",
     items: [
+      { href: "/reports/day-end", label: "Day End (Z Report)", icon: CalendarCheck, roles: ["manager", "cashier"] },
       { href: "/expenses", label: "Expenses", icon: Wallet, roles: ["manager"] },
       { href: "/reports", label: "Reports", icon: BarChart3, roles: ["manager"] },
     ],
@@ -116,6 +118,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (loading || !user) return <Spinner className="h-screen" />;
 
   const allowed = canAccess(pathname, user.role);
+  const activeHref = NAV.flatMap((s) => s.items)
+    .filter((i) => isActive(pathname, i.href))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
   const sections = NAV.map((s) => ({
     ...s,
     items: s.items.filter((i) => user.role === "admin" || i.roles.includes(user.role)),
@@ -148,7 +153,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{s.section}</div>
               {s.items.map((item) => {
                 const Icon = item.icon;
-                const active = isActive(pathname, item.href);
+                const active = activeHref === item.href;
                 return (
                   <Link
                     key={item.href}

@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { Badge, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useToast } from "@/components/ui";
+import { AsyncButton, Badge, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useConfirm, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
@@ -14,6 +14,7 @@ type CatForm = { id?: number; name: string; sort_order: number; is_active: boole
 
 export default function MenuPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [cat, setCat] = useState<number | "all">("all");
   const [search, setSearch] = useState("");
   const { data: categories, reload: reloadCats } = useApi<MenuCategory[]>("/menu/categories", { include_inactive: true });
@@ -66,7 +67,7 @@ export default function MenuPage() {
   };
 
   const del = async (path: string, label: string, after: () => void) => {
-    if (!confirm(`Delete ${label}?`)) return;
+    if (!(await confirm({ title: `Delete ${label}?`, message: "Items that were already sold are hidden instead of deleted, so reports stay intact.", confirmText: "Delete", danger: true }))) return;
     try {
       await api.del(path);
       toast(`${label} deleted`);
@@ -107,8 +108,8 @@ export default function MenuPage() {
               <button className={clsx("flex-1 px-3 py-2 text-left text-sm", cat === c.id && "font-semibold text-brand-700", !c.is_active && "text-slate-400 line-through")} onClick={() => setCat(c.id)}>
                 {c.name} <span className="text-xs text-slate-400">({c.item_count})</span>
               </button>
-              <button className="btn-ghost btn-sm opacity-0 group-hover:opacity-100" onClick={() => setCatForm({ id: c.id, name: c.name, sort_order: c.sort_order, is_active: c.is_active })} aria-label="Edit category"><Pencil size={13} /></button>
-              <button className="btn-ghost btn-sm text-red-600 opacity-0 group-hover:opacity-100" onClick={() => del(`/menu/categories/${c.id}`, `category ${c.name}`, reloadCats)} aria-label="Delete category"><Trash2 size={13} /></button>
+              <button className="btn-ghost btn-sm lg:opacity-0 lg:group-hover:opacity-100" onClick={() => setCatForm({ id: c.id, name: c.name, sort_order: c.sort_order, is_active: c.is_active })} aria-label="Edit category"><Pencil size={13} /></button>
+              <button className="btn-ghost btn-sm text-red-600 lg:opacity-0 lg:group-hover:opacity-100" onClick={() => del(`/menu/categories/${c.id}`, `category ${c.name}`, reloadCats)} aria-label="Delete category"><Trash2 size={13} /></button>
             </div>
           ))}
         </div>
@@ -156,7 +157,7 @@ export default function MenuPage() {
         </div>
       </div>
 
-      <Modal open={!!item} onClose={() => setItem(null)} title={item?.id ? "Edit menu item" : "New menu item"} footer={<button className="btn-primary" onClick={saveItem}>Save</button>}>
+      <Modal open={!!item} onClose={() => setItem(null)} title={item?.id ? "Edit menu item" : "New menu item"} footer={<AsyncButton onClick={saveItem}>Save</AsyncButton>}>
         {item && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Name" className="sm:col-span-2"><input className="input" autoFocus value={item.name} onChange={(e) => setItem({ ...item, name: e.target.value })} /></Field>
@@ -184,7 +185,7 @@ export default function MenuPage() {
           </div>
         )}
       </Modal>
-      <Modal open={!!catForm} onClose={() => setCatForm(null)} title={catForm?.id ? "Edit category" : "New category"} size="sm" footer={<button className="btn-primary" onClick={saveCat}>Save</button>}>
+      <Modal open={!!catForm} onClose={() => setCatForm(null)} title={catForm?.id ? "Edit category" : "New category"} size="sm" footer={<AsyncButton onClick={saveCat}>Save</AsyncButton>}>
         {catForm && (
           <div className="space-y-3">
             <Field label="Name"><input className="input" autoFocus value={catForm.name} onChange={(e) => setCatForm({ ...catForm, name: e.target.value })} /></Field>

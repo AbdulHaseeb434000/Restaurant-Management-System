@@ -2,7 +2,7 @@
 
 import { Pencil, Plus, Ruler, Tags, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useToast } from "@/components/ui";
+import { AsyncButton, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useConfirm, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { money, qty } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
@@ -20,6 +20,7 @@ interface Form {
 
 export default function InventoryItemsPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const { data, error, reload } = useApi<InventoryItem[]>("/inventory/items", { search, include_inactive: true });
   const { data: units, reload: reloadUnits } = useApi<Unit[]>("/inventory/units");
@@ -50,7 +51,7 @@ export default function InventoryItemsPage() {
   };
 
   const remove = async (i: InventoryItem) => {
-    if (!confirm(`Delete ${i.name}? Items with stock history are deactivated instead.`)) return;
+    if (!(await confirm({ title: `Delete ${i.name}?`, message: "Items with stock history are deactivated instead.", confirmText: "Delete", danger: true }))) return;
     try {
       await api.del(`/inventory/items/${i.id}`);
       toast("Item removed");
@@ -102,7 +103,7 @@ export default function InventoryItemsPage() {
         )}
       </div>
 
-      <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Edit item" : "New item"} footer={<button className="btn-primary" onClick={save}>Save</button>}>
+      <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Edit item" : "New item"} footer={<AsyncButton onClick={save}>Save</AsyncButton>}>
         {form && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Name" className="sm:col-span-2"><input className="input" autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>

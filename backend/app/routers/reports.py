@@ -39,11 +39,10 @@ from ..models import (
     Unit,
     User,
 )
-from ..security import require_roles
+from ..security import get_current_user, require_roles
 from ..utils import day_range, today
 
 router = APIRouter(prefix="/api", tags=["reports"])
-report_user = require_roles("manager")
 
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 ORDER_TYPE_LABELS = {"dine_in": "Dine-in", "takeaway": "Take-away", "delivery": "Delivery"}
@@ -81,14 +80,15 @@ class Report:
     description: str
     fn: Callable[[Ctx], dict]
     uses_dates: bool = True
+    extra_roles: tuple[str, ...] = ()  # roles besides admin/manager allowed to run it
 
 
 REPORTS: dict[str, Report] = {}
 
 
-def report(key: str, title: str, group: str, description: str, uses_dates: bool = True):
+def report(key: str, title: str, group: str, description: str, uses_dates: bool = True, extra_roles: tuple = ()):
     def deco(fn):
-        REPORTS[key] = Report(key, title, group, description, fn, uses_dates)
+        REPORTS[key] = Report(key, title, group, description, fn, uses_dates, extra_roles)
         return fn
 
     return deco
@@ -733,13 +733,95 @@ def profit_loss(c: Ctx):
     return {"columns": columns, "rows": data, "totals": None, "chart": None}
 
 
+
+# =========================================================================== DAY END
+
+@report("day-end", "Day-End (Z) Summary", "Sales",
+        "Shift / day closing summary: sales, collections by method, voids and expected cash in drawer.",
+        extra_roles=("cashier",))
+def day_end(c: Ctx):
+    rows: list[dict] = []
+
+    def section(title):
+        rows.append({"line": title, "count": None, "amount": None, "kind": "subtotal"})
+
+    na = object()  # marks "not applicable" so SQL NULL sums still show as 0.00
+
+    def line(title, amount=na, count=None, kind="income"):
+        rows.append({"line": title, "count": count, "amount": None if amount is na else round(num(amount), 2), "kind": kind})
+
+    t = c.db.execute(
+        select(func.count(Order.id), func.sum(Order.subtotal), func.sum(Order.discount_amount),
+               func.sum(Order.service_charge), func.sum(Order.tax_amount), func.sum(Order.delivery_fee),
+               func.sum(Order.total), func.sum(case((Order.order_type == "dine_in", Order.guests), else_=0)))
+        .where(c.completed())
+    ).one()
+    section("Sales")
+    line("Gross sales", t[1], t[0])
+    line("Discounts", -num(t[2]))
+    line("Service charges", t[3])
+    line("Tax", t[4])
+    line("Delivery fees", t[5])
+    line("Net total", t[6], t[0], kind="total")
+    line("Dine-in covers", count=int(t[7] or 0), kind="info")
+
+    section("By order type")
+    for r in c.db.execute(
+        select(Order.order_type, func.count(Order.id), func.sum(Order.total))
+        .where(c.completed()).group_by(Order.order_type).order_by(Order.order_type)
+    ):
+        line(ORDER_TYPE_LABELS.get(r[0], r[0]), r[2], r[1])
+
+    section("Collections")
+    pays = {r[0]: (r[1], num(r[2])) for r in c.db.execute(
+        select(Payment.method, func.count(Payment.id), func.sum(Payment.amount))
+        .join(Order, Order.id == Payment.order_id).where(c.completed()).group_by(Payment.method)
+    )}
+    for m in ("cash", "card", "online"):
+        cnt, amt = pays.get(m, (0, 0.0))
+        line(m.title(), amt, cnt)
+    line("Total collected", sum(v[1] for v in pays.values()), sum(v[0] for v in pays.values()), kind="total")
+
+    section("Cash drawer")
+    cash_sales = pays.get("cash", (0, 0.0))[1]
+    cash_exp = _sum(c, select(func.sum(Expense.amount)).where(
+        Expense.expense_date.between(c.date_from, c.date_to), Expense.payment_method == "cash"))
+    line("Cash sales", cash_sales)
+    line("Cash expenses paid out", -cash_exp)
+    line("Expected cash in drawer (excl. opening float)", cash_sales - cash_exp, kind="total")
+
+    section("Exceptions")
+    cancelled = c.db.execute(
+        select(func.count(Order.id), func.sum(Order.subtotal)).where(c.in_period(), Order.status == "cancelled")
+    ).one()
+    voids = c.db.execute(
+        select(func.count(OrderItem.id), func.sum(OrderItem.line_total))
+        .join(Order, Order.id == OrderItem.order_id)
+        .where(c.in_period(), Order.status != "cancelled", OrderItem.status == "cancelled")
+    ).one()
+    open_orders = c.db.execute(
+        select(func.count(Order.id), func.sum(Order.total)).where(Order.status == "open")
+    ).one()
+    line("Cancelled orders", cancelled[1], cancelled[0], kind="cost")
+    line("Voided items", voids[1], voids[0], kind="cost")
+    line("Orders still open (unsettled, any date)", open_orders[1], open_orders[0], kind="info")
+
+    columns = [col("line", "Line"), col("count", "Count", "number"), col("amount", "Amount", "money")]
+    return {"columns": columns, "rows": rows, "totals": None, "chart": None}
+
+
 # =========================================================================== endpoints
 
+def _can_run(rep: Report, user: User) -> bool:
+    return user.role in ("admin", "manager") or user.role in rep.extra_roles
+
+
 @router.get("/reports")
-def list_reports(_: User = Depends(report_user)):
+def list_reports(user: User = Depends(get_current_user)):
     return [
         {"key": r.key, "title": r.title, "group": r.group, "description": r.description, "uses_dates": r.uses_dates}
         for r in REPORTS.values()
+        if _can_run(r, user)
     ]
 
 
@@ -749,12 +831,14 @@ def run_report(
     date_from: date | None = None,
     date_to: date | None = None,
     db: Session = Depends(get_db),
-    _: User = Depends(report_user),
+    user: User = Depends(get_current_user),
 ):
     rep = REPORTS.get(key)
     if not rep:
         raise HTTPException(status_code=404, detail="Report not found")
-    start, end, d_from, d_to = day_range(date_from, date_to, default_days=6)
+    if not _can_run(rep, user):
+        raise HTTPException(status_code=403, detail="You do not have permission for this report")
+    start, end, d_from, d_to = day_range(date_from, date_to, default_days=0 if key == "day-end" else 6)
     result = rep.fn(Ctx(db, start, end, d_from, d_to))
     return {
         "key": rep.key,

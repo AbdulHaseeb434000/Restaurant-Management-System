@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { Empty, ErrorBox, Field, Modal, PageHeader, Spinner, useToast } from "@/components/ui";
+import { AsyncButton, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { dateOnly, daysAgo, isoDate, money, qty, titleCase } from "@/lib/format";
@@ -96,7 +96,7 @@ export default function AdjustmentsPage() {
         )}
       </div>
 
-      <Modal open={!!form} onClose={() => setForm(null)} title="New stock adjustment" footer={<button className="btn-primary" onClick={save}>Save</button>}>
+      <Modal open={!!form} onClose={() => setForm(null)} title="New stock adjustment" footer={<AsyncButton onClick={save}>Save</AsyncButton>}>
         {form && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Item" className="sm:col-span-2">

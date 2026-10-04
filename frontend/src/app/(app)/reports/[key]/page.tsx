@@ -65,8 +65,8 @@ function csvEscape(v: unknown) {
 
 export default function ReportPage() {
   const { key } = useParams<{ key: string }>();
-  const { settings } = useAuth();
-  const [dateFrom, setDateFrom] = useState(daysAgo(6));
+  const { settings, hasRole } = useAuth();
+  const [dateFrom, setDateFrom] = useState(key === "day-end" ? isoDate() : daysAgo(6));
   const [dateTo, setDateTo] = useState(isoDate());
   const { data, error, loading } = useApi<ReportResult>(`/reports/${key}`, { date_from: dateFrom, date_to: dateTo });
 
@@ -110,9 +110,11 @@ export default function ReportPage() {
 
   return (
     <div>
-      <div className="no-print mb-2">
-        <Link href="/reports" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><ArrowLeft size={14} /> All reports</Link>
-      </div>
+      {hasRole("manager") && (
+        <div className="no-print mb-2">
+          <Link href="/reports" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><ArrowLeft size={14} /> All reports</Link>
+        </div>
+      )}
       <PageHeader
         title={data?.title ?? "Report"}
         subtitle={data?.description}
@@ -190,7 +192,7 @@ export default function ReportPage() {
                     <tr key={i} className={clsx(r.kind === "subtotal" && "bg-slate-50 font-semibold", r.kind === "total" && "bg-brand-50 text-base font-bold", r.kind === "info" && "text-slate-500 italic")}>
                       {data.columns.map((c) => (
                         <td key={c.key} className={clsx("whitespace-nowrap", ["money", "number", "percent", "qty"].includes(c.type) && "text-right", c.type === "money" && Number(r[c.key]) < 0 && "text-red-600")}>
-                          {fmt(c, r[c.key])}
+                          {r.kind === "subtotal" && (r[c.key] === null || r[c.key] === undefined) ? "" : fmt(c, r[c.key])}
                         </td>
                       ))}
                     </tr>

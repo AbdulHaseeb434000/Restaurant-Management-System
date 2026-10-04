@@ -2,7 +2,7 @@
 
 import { Pencil, Plus, Tags, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { Empty, ErrorBox, Field, Modal, PageHeader, Spinner, useToast } from "@/components/ui";
+import { AsyncButton, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, useConfirm, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { dateOnly, isoDate, money, titleCase } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
@@ -12,6 +12,7 @@ type Form = { id?: number; expense_date: string; category_id: number | ""; amoun
 
 export default function ExpensesPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const now = new Date();
   const [dateFrom, setDateFrom] = useState(isoDate(new Date(now.getFullYear(), now.getMonth(), 1)));
   const [dateTo, setDateTo] = useState(isoDate());
@@ -39,7 +40,7 @@ export default function ExpensesPage() {
   };
 
   const remove = async (e: Expense) => {
-    if (!confirm("Delete this expense?")) return;
+    if (!(await confirm({ title: "Delete this expense?", message: `${e.category_name} - ${money(e.amount)}`, confirmText: "Delete", danger: true }))) return;
     try {
       await api.del(`/expenses/${e.id}`);
       reload();
@@ -94,7 +95,7 @@ export default function ExpensesPage() {
           </table>
         )}
       </div>
-      <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Edit expense" : "Add expense"} footer={<button className="btn-primary" onClick={save}>Save</button>}>
+      <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Edit expense" : "Add expense"} footer={<AsyncButton onClick={save}>Save</AsyncButton>}>
         {form && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Date"><input className="input" type="date" value={form.expense_date} onChange={(e) => setForm({ ...form, expense_date: e.target.value })} /></Field>

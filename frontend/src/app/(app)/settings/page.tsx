@@ -2,7 +2,7 @@
 
 import { Save } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Field, PageHeader, Spinner, useToast } from "@/components/ui";
+import { AsyncButton, Field, PageHeader, Spinner, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { AppSettings } from "@/lib/types";
@@ -48,7 +48,7 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-3xl">
-      <PageHeader title="Settings" subtitle="Restaurant profile, taxes and charges" actions={<button className="btn-primary" onClick={save}><Save size={16} /> Save settings</button>} />
+      <PageHeader title="Settings" subtitle="Restaurant profile, taxes and charges" actions={<AsyncButton onClick={save}><Save size={16} /> Save settings</AsyncButton>} />
       <div className="card grid gap-4 p-5 sm:grid-cols-2">
         <Field label="Restaurant name" className="sm:col-span-2"><input className="input" value={form.restaurant_name} onChange={(e) => set("restaurant_name", e.target.value)} /></Field>
         <Field label="Address" className="sm:col-span-2"><input className="input" value={form.address} onChange={(e) => set("address", e.target.value)} /></Field>

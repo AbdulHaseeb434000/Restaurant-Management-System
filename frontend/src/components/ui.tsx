@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { Loader2, X } from "lucide-react";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 // ------------------------------------------------------------------ toast
 
@@ -100,7 +100,63 @@ export function Modal({
   );
 }
 
-// ------------------------------------------------------------------ confirm / prompt
+
+// ------------------------------------------------------------------ confirm (promise based)
+
+interface ConfirmOptions {
+  title: string;
+  message?: string;
+  confirmText?: string;
+  danger?: boolean;
+}
+
+const ConfirmContext = createContext<(o: ConfirmOptions) => Promise<boolean>>(async () => false);
+
+export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const [opts, setOpts] = useState<ConfirmOptions | null>(null);
+  const resolver = useRef<((v: boolean) => void) | null>(null);
+  const ask = useCallback((o: ConfirmOptions) => {
+    setOpts(o);
+    return new Promise<boolean>((resolve) => {
+      resolver.current = resolve;
+    });
+  }, []);
+  const close = (v: boolean) => {
+    resolver.current?.(v);
+    resolver.current = null;
+    setOpts(null);
+  };
+  return (
+    <ConfirmContext.Provider value={ask}>
+      {children}
+      <Modal
+        open={!!opts}
+        title={opts?.title ?? ""}
+        onClose={() => close(false)}
+        size="sm"
+        footer={
+          <>
+            <button className="btn-secondary" onClick={() => close(false)}>
+              Cancel
+            </button>
+            <button autoFocus className={opts?.danger ? "btn-danger" : "btn-primary"} onClick={() => close(true)}>
+              {opts?.confirmText ?? "Confirm"}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-600">{opts?.message}</p>
+      </Modal>
+    </ConfirmContext.Provider>
+  );
+}
+
+/** `if (!(await confirm({ title: "Delete?" }))) return;` */
+export function useConfirm() {
+  return useContext(ConfirmContext);
+}
+
+// ------------------------------------------------------------------ prompt with reason
 
 export function PromptDialog({
   open,
@@ -175,6 +231,37 @@ export function PromptDialog({
   );
 }
 
+// ------------------------------------------------------------------ async button
+
+/** Button that disables itself and shows a spinner while its async onClick runs (prevents double submits). */
+export function AsyncButton({
+  onClick,
+  className = "btn-primary",
+  disabled,
+  children,
+  ...rest
+}: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onClick"> & { onClick: () => Promise<unknown> | unknown }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      {...rest}
+      className={className}
+      disabled={disabled || busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await onClick();
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy && <Loader2 size={16} className="animate-spin" />}
+      {children}
+    </button>
+  );
+}
+
 // ------------------------------------------------------------------ misc
 
 export function Spinner({ className }: { className?: string }) {
@@ -183,6 +270,12 @@ export function Spinner({ className }: { className?: string }) {
       <Loader2 className="animate-spin" />
     </div>
   );
+}
+
+export function usePageTitle(title: string) {
+  useEffect(() => {
+    document.title = `${title} · Restaurant Manager`;
+  }, [title]);
 }
 
 export function PageHeader({
@@ -194,6 +287,7 @@ export function PageHeader({
   subtitle?: string;
   actions?: React.ReactNode;
 }) {
+  usePageTitle(title);
   return (
     <div className="no-print mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>

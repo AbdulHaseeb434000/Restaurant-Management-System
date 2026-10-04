@@ -1,6 +1,6 @@
 # Restaurant Management System
 
-A restaurant management app for dine-in, take-away and delivery. It covers a POS, table management, a kitchen display, menu management, ingredient inventory (purchases and store-to-kitchen issues) and 22 business reports.
+A restaurant management app for dine-in, take-away and delivery. It covers a POS, table management, a kitchen display, menu management, ingredient inventory (purchases and store-to-kitchen issues) and 23 business reports.
 
 **Stack:** FastAPI + SQLAlchemy 2 (Python 3.11), PostgreSQL 16 and Next.js 15 (React 19, TypeScript, Tailwind CSS, Recharts).
 
@@ -11,10 +11,10 @@ A restaurant management app for dine-in, take-away and delivery. It covers a POS
 ### Front of house
 | Module | What it does |
 |---|---|
-| **POS** | Touch-friendly menu grid with category tabs and search. Supports dine-in (table + guests), take-away and delivery (phone lookup auto-fills the saved customer and address). You can hold or save an order, send new items to the kitchen (each send creates a numbered **KOT**), add item notes ("extra spicy"), apply a % or flat discount, transfer to another table, void sent items (full or partial quantity, with a reason), cancel the order, take split payments (cash / card / online) with a change calculator, and print the bill, receipt and KOT. |
+| **POS** | Touch-friendly menu grid with category tabs and search. Supports dine-in (table + guests), take-away and delivery (phone lookup auto-fills the saved customer and address). You can hold or save an order, send new items to the kitchen (each send creates a numbered **KOT**), add item notes ("extra spicy"), apply a % or flat discount, transfer to another table, void sent items (full or partial quantity, with a reason), cancel the order, take split payments (cash / card / online) with a change calculator, and print the bill, receipt and KOT. An **Open orders** drawer lets you resume held orders, menu tiles show how many of each item are already on the order, and `/` or `F2` jumps to the menu search (Enter adds the only match). |
 | **Tables** | Live floor plan grouped by area. Shows available / occupied / reserved / cleaning, plus the running bill and minutes seated. Tap a free table to start an order, or an occupied one to open it. Managers can add, edit and delete tables and areas. |
 | **Orders** | Order history with status, type, date and text filters. Open any order in the POS, reprint receipts, and (managers) reopen completed orders. |
-| **Kitchen Display (KDS)** | Auto-refreshing ticket board, one card per KOT. Cards are colour-coded by age (10 / 20 min), item notes are highlighted, and you can move single items or whole tickets through Start → Ready → Served. |
+| **Kitchen Display (KDS)** | Auto-refreshing ticket board, one card per KOT. Cards are colour-coded by age (10 / 20 min), item notes are highlighted, and you can move single items or whole tickets through Start → Ready → Served. Optional **chime** on new tickets, a fullscreen mode, and a **Sold out** list so the kitchen can stop the POS selling a dish. |
 | **Deliveries** | Board with three columns: Pending → Out for delivery (rider assignment) → Delivered today. |
 | **Customers** | Directory with order count and lifetime spend. Customers are created automatically from delivery and take-away phone numbers. |
 
@@ -32,10 +32,10 @@ A restaurant management app for dine-in, take-away and delivery. It covers a POS
 | **Users & roles** | admin, manager, cashier, waiter, kitchen, storekeeper. Every API endpoint and every screen is role-checked. |
 | **Settings** | Restaurant name, address and phone for receipts, currency, tax %, dine-in service charge %, default delivery fee and receipt footer. |
 
-### Reports (22)
+### Reports (23)
 Each report runs for any date range and has a chart, totals, CSV export and print.
 
-**Sales:** Daily Sales Summary · Sales by Order Type · Item-wise Sales · Category-wise Sales · Hourly Sales (peak hours) · Day-of-Week Sales · Payment Method Summary · Discount Report · Cancelled Orders & Voided Items · Table Performance (covers, avg/cover, seating time) · Staff Sales Performance · Top Customers · Delivery Report (per rider) · Non-Selling Menu Items
+**Sales:** Day-End (Z) Summary (cashiers can run it too; it shows collections by method and expected cash in the drawer) · Daily Sales Summary · Sales by Order Type · Item-wise Sales · Category-wise Sales · Hourly Sales (peak hours) · Day-of-Week Sales · Payment Method Summary · Discount Report · Cancelled Orders & Voided Items · Table Performance (covers, avg/cover, seating time) · Staff Sales Performance · Top Customers · Delivery Report (per rider) · Non-Selling Menu Items
 
 **Inventory:** Purchases by Supplier · Item-wise Purchases (min/max/avg price) · Store-to-Kitchen Issues · Current Stock & Valuation · Low Stock / Reorder List (suggested qty & cost) · Wastage & Adjustments
 
@@ -66,7 +66,7 @@ docker compose up --build
 - App: http://localhost:3111
 - API docs (Swagger): http://localhost:8111/docs
 
-On first start the backend creates the tables. It loads demo data (menu, 17 tables, 35 ingredients, 5 suppliers, about 30 days of orders, purchases and issues) into an **empty** database. Set `SEED_DEMO_DATA=false` for a clean install; only the admin user, settings, units and expense categories are created then.
+On start the backend applies any pending database migrations (Alembic). It loads demo data (menu, 17 tables, 35 ingredients, 5 suppliers, about 30 days of orders, purchases and issues) into an **empty** database. Set `SEED_DEMO_DATA=false` for a clean install; only the admin user, settings, units and expense categories are created then.
 
 ### Demo logins
 | Username | Password | Role | Lands on |
@@ -101,6 +101,14 @@ npm install
 BACKEND_URL=http://localhost:8111 npm run dev    # http://localhost:3111
 ```
 The browser only talks to `/api/*` on the Next.js origin, and Next proxies those calls to FastAPI (`next.config.mjs`), so no CORS setup is needed.
+
+### Database migrations
+The schema is managed with Alembic (`backend/migrations`) and migrations run automatically when the backend starts. A database created by an earlier version (before migrations existed) is detected and stamped, so no data is lost. After changing `app/models.py`, generate a migration:
+```bash
+cd backend
+alembic revision --autogenerate -m "describe the change"
+alembic upgrade head        # or just restart the backend
+```
 
 ### Tests
 ```bash
@@ -143,5 +151,4 @@ frontend/
 
 ## Not included yet (next phases)
 - Recipe / BOM mapping with automatic ingredient deduction per sale
-- Database migrations (Alembic). Tables are currently created with `create_all`.
 - Shift / cash-drawer closing, purchase orders before GRN, multi-branch

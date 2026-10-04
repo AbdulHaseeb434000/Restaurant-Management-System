@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { Clock, Pencil, Plus, Settings2, Trash2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Empty, ErrorBox, Field, Modal, PageHeader, Spinner, StatusBadge, Toggle, useToast } from "@/components/ui";
+import { AsyncButton, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, StatusBadge, Toggle, useConfirm, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { minutesSince, money } from "@/lib/format";
@@ -21,6 +21,7 @@ const STATUS_STYLE: Record<DiningTable["status"], string> = {
 export default function TablesPage() {
   const router = useRouter();
   const toast = useToast();
+  const confirm = useConfirm();
   const { hasRole } = useAuth();
   const isManager = hasRole("manager");
   const { data: tables, error, reload } = useApi<DiningTable[]>("/tables", undefined, { refreshMs: 15000 });
@@ -90,7 +91,7 @@ export default function TablesPage() {
   };
 
   const remove = async (path: string, label: string, after: () => void) => {
-    if (!confirm(`Delete ${label}?`)) return;
+    if (!(await confirm({ title: `Delete ${label}?`, message: label.startsWith("table") ? "Tables with order history are deactivated instead." : undefined, confirmText: "Delete", danger: true }))) return;
     try {
       await api.del(path);
       toast(`${label} deleted`);
@@ -226,7 +227,7 @@ export default function TablesPage() {
         onClose={() => setEditTable(null)}
         title={editTable?.id ? "Edit table" : "Add table"}
         size="sm"
-        footer={<button className="btn-primary" onClick={saveTable}>Save</button>}
+        footer={<AsyncButton onClick={saveTable}>Save</AsyncButton>}
       >
         {editTable && (
           <div className="space-y-3">
@@ -242,7 +243,7 @@ export default function TablesPage() {
           </div>
         )}
       </Modal>
-      <Modal open={!!editArea} onClose={() => setEditArea(null)} title={editArea?.id ? "Edit area" : "Add area"} size="sm" footer={<button className="btn-primary" onClick={saveArea}>Save</button>}>
+      <Modal open={!!editArea} onClose={() => setEditArea(null)} title={editArea?.id ? "Edit area" : "Add area"} size="sm" footer={<AsyncButton onClick={saveArea}>Save</AsyncButton>}>
         <Field label="Name"><input className="input" autoFocus value={editArea?.name ?? ""} onChange={(e) => setEditArea({ ...editArea, name: e.target.value })} /></Field>
       </Modal>
     </div>

@@ -2,7 +2,7 @@
 
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { Empty, ErrorBox, Field, Modal, PageHeader, Spinner, useToast } from "@/components/ui";
+import { AsyncButton, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, useConfirm, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { dateOnly, money } from "@/lib/format";
@@ -13,6 +13,7 @@ const EMPTY = { name: "", phone: "", email: "", address: "", notes: "" };
 
 export default function CustomersPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { hasRole } = useAuth();
   const [search, setSearch] = useState("");
   const { data, error, reload } = useApi<Customer[]>("/customers", { search, limit: 500 });
@@ -33,7 +34,7 @@ export default function CustomersPage() {
   };
 
   const remove = async (c: Customer) => {
-    if (!confirm(`Delete ${c.name}?`)) return;
+    if (!(await confirm({ title: `Delete ${c.name}?`, confirmText: "Delete", danger: true }))) return;
     try {
       await api.del(`/customers/${c.id}`);
       toast("Customer deleted");
@@ -73,7 +74,7 @@ export default function CustomersPage() {
           </table>
         )}
       </div>
-      <Modal open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? "Edit customer" : "Add customer"} footer={<button className="btn-primary" onClick={save}>Save</button>}>
+      <Modal open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? "Edit customer" : "Add customer"} footer={<AsyncButton onClick={save}>Save</AsyncButton>}>
         {edit && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Name"><input className="input" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>

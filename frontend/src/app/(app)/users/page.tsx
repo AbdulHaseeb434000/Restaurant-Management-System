@@ -2,7 +2,7 @@
 
 import { Pencil, Plus } from "lucide-react";
 import { useState } from "react";
-import { Badge, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useToast } from "@/components/ui";
+import { AsyncButton, Badge, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { dateOnly } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
@@ -69,7 +69,7 @@ export default function UsersPage() {
           {ROLES.map((r) => <li key={r.key}><b className="capitalize">{r.key}</b> - <span className="text-slate-600">{r.desc}</span></li>)}
         </ul>
       </div>
-      <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Edit user" : "Add user"} footer={<button className="btn-primary" onClick={save}>Save</button>}>
+      <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Edit user" : "Add user"} footer={<AsyncButton onClick={save}>Save</AsyncButton>}>
         {form && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Username"><input className="input" disabled={!!form.id} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></Field>

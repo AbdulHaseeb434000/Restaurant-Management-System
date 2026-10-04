@@ -8,17 +8,23 @@ os.environ["SEED_DEMO_DATA"] = "false"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import text  # noqa: E402
 
-from app.database import Base, engine  # noqa: E402
+from app.database import engine  # noqa: E402
 from app.main import app  # noqa: E402
 
 
 @pytest.fixture(scope="session")
 def client():
-    Base.metadata.drop_all(bind=engine)
-    with TestClient(app) as c:
+    _reset_schema()
+    with TestClient(app) as c:  # startup runs the Alembic migrations
         yield c
-    Base.metadata.drop_all(bind=engine)
+    _reset_schema()
+
+
+def _reset_schema():
+    with engine.begin() as conn:
+        conn.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public"))
 
 
 def login(client, username, password):
