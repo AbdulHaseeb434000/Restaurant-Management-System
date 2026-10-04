@@ -295,7 +295,9 @@ class OrderListOut(ORM):
     table_name: str | None = None
     customer_name: str
     customer_phone: str
+    delivery_address: str
     delivery_status: str | None
+    rider_name: str
     total: Num
     paid_amount: Num
     item_count: int = 0

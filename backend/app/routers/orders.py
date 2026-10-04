@@ -183,6 +183,7 @@ def _finish(db: Session, order: Order) -> OrderOut:
 def list_orders(
     status: str | None = None,
     order_type: str | None = None,
+    delivery_status: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
     search: str | None = None,
@@ -200,6 +201,8 @@ def list_orders(
         stmt = stmt.where(Order.status.in_(status.split(",")))
     if order_type:
         stmt = stmt.where(Order.order_type == order_type)
+    if delivery_status:
+        stmt = stmt.where(Order.delivery_status.in_(delivery_status.split(",")))
     if date_from or date_to:
         start, end, *_ = day_range(date_from, date_to)
         stmt = stmt.where(Order.created_at >= start, Order.created_at < end)
