@@ -34,7 +34,12 @@ from ..security import (
     get_current_user,
     require_roles,
 )
-from ..services import balance_due, recalc_order
+from ..services import (
+    balance_due,
+    deduct_recipe_stock,
+    recalc_order,
+    reverse_recipe_stock,
+)
 from ..utils import day_range, get_app_settings, get_or_404, q2
 
 router = APIRouter(prefix="/api", tags=["orders"])
@@ -473,8 +478,9 @@ def remove_payment(
     return _finish(db, order)
 
 
-def _complete(db: Session, order: Order) -> None:
-    recalc_order(order, get_app_settings(db))
+def _complete(db: Session, order: Order, user_id: int | None = None) -> None:
+    settings = get_app_settings(db)
+    recalc_order(order, settings)
     if not any(i.status != "cancelled" for i in order.items):
         raise HTTPException(status_code=400, detail="Order has no items. Cancel it instead.")
     if balance_due(order) > 0:
@@ -490,6 +496,7 @@ def _complete(db: Session, order: Order) -> None:
     _send_to_kitchen(order)  # quick-service: anything not yet fired goes to the kitchen now
     order.status = "completed"
     order.completed_at = now()
+    deduct_recipe_stock(db, order, settings, user_id)
     _release_table(db, order)
 
 
@@ -509,7 +516,7 @@ def complete_order(
             order.payments.append(
                 Payment(method=p.method, amount=q2(p.amount), reference=p.reference, received_by_id=user.id)
             )
-    _complete(db, order)
+    _complete(db, order, user.id)
     return _finish(db, order)
 
 
@@ -527,10 +534,11 @@ def cancel_order(order_id: int, data: CancelIn, db: Session = Depends(get_db), _
 
 
 @router.post("/orders/{order_id}/reopen", response_model=OrderOut)
-def reopen_order(order_id: int, db: Session = Depends(get_db), _: User = Depends(require_roles(*MANAGERS))):
+def reopen_order(order_id: int, db: Session = Depends(get_db), user: User = Depends(require_roles(*MANAGERS))):
     order = _load_order(db, order_id, lock=True)
     if order.status != "completed":
         raise HTTPException(status_code=400, detail="Only completed orders can be reopened")
+    reverse_recipe_stock(db, order, user.id)
     if order.table_id:
         table = _check_table_free(db, order.table_id, exclude_order_id=order.id)
         table.status = "occupied"

@@ -32,15 +32,17 @@ from ..models import (
     Payment,
     Purchase,
     PurchaseItem,
+    RecipeLine,
     StockAdjustment,
     StockIssue,
     StockIssueItem,
+    StockMovement,
     Supplier,
     Unit,
     User,
 )
 from ..security import get_current_user, require_roles
-from ..utils import day_range, today
+from ..utils import day_range, get_app_settings, today
 
 router = APIRouter(prefix="/api", tags=["reports"])
 
@@ -697,16 +699,30 @@ def _sum(c: Ctx, stmt) -> float:
     return num(c.db.scalar(stmt))
 
 
-@report("profit-loss", "Profit & Loss Summary", "Finance", "Net sales minus food cost (kitchen issues) and expenses. Food cost uses store-to-kitchen issues since recipes are not mapped yet.")
+@report("profit-loss", "Profit & Loss Summary", "Finance", "Net sales minus food cost and expenses. Food cost follows the inventory method in Settings: value issued to the kitchen, or recipe cost of dishes sold.")
 def profit_loss(c: Ctx):
     net_sales = _sum(c, select(func.sum(Order.subtotal - Order.discount_amount)).where(c.completed()))
     service = _sum(c, select(func.sum(Order.service_charge)).where(c.completed()))
     delivery = _sum(c, select(func.sum(Order.delivery_fee)).where(c.completed()))
     tax = _sum(c, select(func.sum(Order.tax_amount)).where(c.completed()))
-    food_cost = _sum(c, select(func.sum(StockIssue.total_value)).where(StockIssue.issue_date.between(c.date_from, c.date_to)))
-    waste = -_sum(c, select(func.sum(StockAdjustment.value)).where(
-        StockAdjustment.adjustment_date.between(c.date_from, c.date_to),
-        StockAdjustment.location == "store", StockAdjustment.value < 0))
+    recipe_mode = get_app_settings(c.db).inventory_mode == "recipe"
+    if recipe_mode:
+        # cost of ingredients deducted for the dishes sold (recorded at completion)
+        food_cost = _sum(c, select(func.sum(OrderItem.cost_amount)).join(Order, Order.id == OrderItem.order_id)
+                         .where(c.completed(), OrderItem.status != "cancelled"))
+        food_label = "Food cost (recipe cost of dishes sold)"
+        # all stock losses; kitchen 'consumption' entries are excluded since recipes already cover usage
+        waste = -_sum(c, select(func.sum(StockAdjustment.value)).where(
+            StockAdjustment.adjustment_date.between(c.date_from, c.date_to),
+            StockAdjustment.reason.in_(["wastage", "damage", "count_correction"]), StockAdjustment.value < 0))
+        waste_label = "Wastage, damage & count losses"
+    else:
+        food_cost = _sum(c, select(func.sum(StockIssue.total_value)).where(StockIssue.issue_date.between(c.date_from, c.date_to)))
+        food_label = "Food cost (issued to kitchen)"
+        waste = -_sum(c, select(func.sum(StockAdjustment.value)).where(
+            StockAdjustment.adjustment_date.between(c.date_from, c.date_to),
+            StockAdjustment.location == "store", StockAdjustment.value < 0))
+        waste_label = "Store wastage / damage"
     expenses = _sum(c, select(func.sum(Expense.amount)).where(Expense.expense_date.between(c.date_from, c.date_to)))
     revenue = net_sales + service + delivery
     gross_profit = revenue - food_cost - waste
@@ -720,8 +736,8 @@ def profit_loss(c: Ctx):
         ("Service charges", service, "income"),
         ("Delivery fees", delivery, "income"),
         ("Total revenue (excl. tax)", revenue, "subtotal"),
-        ("Food cost (issued to kitchen)", -food_cost, "cost"),
-        ("Store wastage / damage", -waste, "cost"),
+        (food_label, -food_cost, "cost"),
+        (waste_label, -waste, "cost"),
         ("Gross profit", gross_profit, "subtotal"),
         ("Operating expenses", -expenses, "cost"),
         ("Net profit", net_profit, "total"),
@@ -732,6 +748,115 @@ def profit_loss(c: Ctx):
     columns = [col("line", "Line"), col("amount", "Amount", "money"), col("pct", "% of Revenue", "percent")]
     return {"columns": columns, "rows": data, "totals": None, "chart": None}
 
+
+
+
+# =========================================================================== RECIPES
+
+@report("menu-costing", "Menu Costing & Profitability", "Inventory",
+        "Recipe cost, margin and food cost % of every dish, with quantity sold and gross profit in the period.")
+def menu_costing(c: Ctx):
+    cost_sq = (
+        select(RecipeLine.menu_item_id.label("mid"), func.sum(RecipeLine.quantity * InventoryItem.avg_cost).label("cost"),
+               func.count(RecipeLine.id).label("lines"))
+        .join(InventoryItem, InventoryItem.id == RecipeLine.inventory_item_id)
+        .group_by(RecipeLine.menu_item_id)
+        .subquery()
+    )
+    sold_sq = (
+        select(OrderItem.menu_item_id.label("mid"), func.sum(OrderItem.quantity).label("qty"),
+               func.sum(OrderItem.line_total).label("revenue"))
+        .join(Order, Order.id == OrderItem.order_id)
+        .where(c.completed(), OrderItem.status != "cancelled")
+        .group_by(OrderItem.menu_item_id)
+        .subquery()
+    )
+    rows = c.db.execute(
+        select(MenuItem.name, MenuCategory.name, MenuItem.price, cost_sq.c.cost, cost_sq.c.lines,
+               sold_sq.c.qty, sold_sq.c.revenue)
+        .join(MenuCategory, MenuCategory.id == MenuItem.category_id)
+        .outerjoin(cost_sq, cost_sq.c.mid == MenuItem.id)
+        .outerjoin(sold_sq, sold_sq.c.mid == MenuItem.id)
+        .where(MenuItem.is_active.is_(True))
+        .order_by(MenuCategory.sort_order, MenuCategory.name, MenuItem.name)
+    ).all()
+    data = []
+    for name, cat, price, cost, lines, qty, revenue in rows:
+        price, cost, qty, revenue = num(price), num(cost), int(qty or 0), num(revenue)
+        has_recipe = bool(lines)
+        data.append({
+            "item": name, "category": cat, "price": price,
+            "recipe_cost": round(cost, 2) if has_recipe else None,
+            "margin": round(price - cost, 2) if has_recipe else None,
+            "food_cost_pct": round(cost * 100 / price, 2) if has_recipe and price else None,
+            "qty": qty, "revenue": revenue,
+            "cost_of_sales": round(cost * qty, 2) if has_recipe else None,
+            "gross_profit": round(revenue - cost * qty, 2) if has_recipe else None,
+            "status": "OK" if has_recipe else "NO RECIPE",
+        })
+    columns = [
+        col("item", "Item"), col("category", "Category"), col("price", "Price", "money"),
+        col("recipe_cost", "Recipe Cost", "money"), col("margin", "Margin / Portion", "money"),
+        col("food_cost_pct", "Food Cost %", "percent"), col("qty", "Qty Sold", "number", True),
+        col("revenue", "Revenue", "money", True), col("cost_of_sales", "Cost of Sales", "money", True),
+        col("gross_profit", "Gross Profit", "money", True), col("status", "Recipe", "status"),
+    ]
+    return {"columns": columns, "rows": data, "totals": _with_totals(columns, data),
+            "chart": {"type": "bar", "x": "item", "y": ["food_cost_pct"], "limit": 20}}
+
+
+@report("ingredient-variance", "Ingredient Usage Variance", "Inventory",
+        "Expected ingredient use (dishes sold x recipes) against what was issued to the kitchen and what recipes deducted. Large gaps point to waste, over-portioning or theft.")
+def ingredient_variance(c: Ctx):
+    expected = {
+        r[0]: num(r[1])
+        for r in c.db.execute(
+            select(RecipeLine.inventory_item_id, func.sum(RecipeLine.quantity * OrderItem.quantity))
+            .join(OrderItem, OrderItem.menu_item_id == RecipeLine.menu_item_id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .where(c.completed(), OrderItem.status != "cancelled")
+            .group_by(RecipeLine.inventory_item_id)
+        )
+    }
+    def by_type(types):
+        return {
+            r[0]: -num(r[1]) if types[0].startswith("sale") else num(r[1])
+            for r in c.db.execute(
+                select(StockMovement.item_id, func.sum(StockMovement.quantity))
+                .where(StockMovement.movement_type.in_(types),
+                       StockMovement.movement_date.between(c.date_from, c.date_to))
+                .group_by(StockMovement.item_id)
+            )
+        }
+    issued = by_type(["issue_in"])
+    deducted = by_type(["sale", "sale_reversal"])
+    ids = set(expected) | set(issued) | set(deducted)
+    items = {
+        i.id: i for i in c.db.scalars(select(InventoryItem).where(InventoryItem.id.in_(ids)))
+    } if ids else {}
+    units = {u.id: u.abbreviation for u in c.db.scalars(select(Unit))}
+    data = []
+    for item_id in ids:
+        it = items[item_id]
+        cost = num(it.avg_cost)
+        exp, iss, ded = expected.get(item_id, 0.0), issued.get(item_id, 0.0), deducted.get(item_id, 0.0)
+        var = iss - exp
+        data.append({
+            "item": it.name, "unit": units.get(it.unit_id, ""), "expected": round(exp, 3),
+            "expected_value": round(exp * cost, 2), "issued": round(iss, 3), "deducted": round(ded, 3),
+            "variance": round(var, 3), "variance_value": round(var * cost, 2),
+            "variance_pct": round(var * 100 / exp, 1) if exp else None,
+        })
+    data.sort(key=lambda d: -abs(d["variance_value"]))
+    columns = [
+        col("item", "Ingredient"), col("unit", "Unit"),
+        col("expected", "Expected Use (recipes)", "qty"), col("expected_value", "Expected Value", "money", True),
+        col("issued", "Issued to Kitchen", "qty"), col("deducted", "Deducted by Recipes", "qty"),
+        col("variance", "Variance (issued - expected)", "qty"), col("variance_value", "Variance Value", "money", True),
+        col("variance_pct", "Variance %", "percent"),
+    ]
+    return {"columns": columns, "rows": data, "totals": _with_totals(columns, data),
+            "chart": {"type": "bar", "x": "item", "y": ["variance_value"], "limit": 15}}
 
 
 # =========================================================================== DAY END

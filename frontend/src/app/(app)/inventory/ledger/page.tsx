@@ -42,7 +42,7 @@ function Ledger() {
         </select>
         <select className="input" value={type} onChange={(e) => setType(e.target.value)} aria-label="Type">
           <option value="">All movement types</option>
-          {["purchase", "purchase_cancel", "issue_out", "issue_in", "adjustment"].map((t) => <option key={t} value={t}>{titleCase(t)}</option>)}
+          {["purchase", "purchase_cancel", "issue_out", "issue_in", "adjustment", "sale", "sale_reversal"].map((t) => <option key={t} value={t}>{titleCase(t)}</option>)}
         </select>
         <input className="input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="From" />
         <input className="input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} aria-label="To" />

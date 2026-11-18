@@ -41,6 +41,19 @@ def _json_default(v):
     raise TypeError(f"Cannot serialise {type(v)!r}")
 
 
+def _older_revisions(current: str | None) -> set[str]:
+    """Revisions that come before `current` in the migration history."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    from .migrate import ALEMBIC_INI
+
+    if not current:
+        return set()
+    script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
+    return {rev.revision for rev in script.iterate_revisions(current, "base")} - {current}
+
+
 def _current_revision(conn: Connection) -> str | None:
     try:
         return conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
@@ -113,10 +126,13 @@ def restore_backup_bytes(content: bytes) -> dict:
     counts: dict[str, int] = {}
     with engine.begin() as conn:  # one transaction: all or nothing
         current = _current_revision(conn)
-        if payload.get("schema_revision") != current:
+        backup_rev = payload.get("schema_revision")
+        # Same version, or an older one: migrations only ever ADD tables/columns (with defaults),
+        # so older data loads into the current schema and new columns take their default values.
+        if backup_rev != current and backup_rev not in _older_revisions(current):
             raise BackupError(
                 f"Backup was made with database version {payload.get('schema_revision')} but this app is at "
-                f"{current}. Restore it with the same app version."
+                f"{current}. Update the app to the same or a newer version, then restore."
             )
         names = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
         conn.execute(text(f"TRUNCATE {names} RESTART IDENTITY CASCADE"))

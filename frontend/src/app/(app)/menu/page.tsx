@@ -1,15 +1,16 @@
 "use client";
 
 import clsx from "clsx";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { BookOpenCheck, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AsyncButton, Badge, Empty, ErrorBox, Field, Modal, PageHeader, Spinner, Toggle, useConfirm, useToast } from "@/components/ui";
 import ExportButton from "@/components/ExportButton";
+import RecipeEditor from "@/components/RecipeEditor";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
 import { menuSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
-import type { MenuCategory, MenuItem } from "@/lib/types";
+import type { MenuCategory, MenuItem, RecipeSummary } from "@/lib/types";
 
 type ItemForm = Omit<MenuItem, "id" | "category_name"> & { id?: number };
 type CatForm = { id?: number; name: string; sort_order: number; is_active: boolean };
@@ -20,6 +21,9 @@ export default function MenuPage() {
   const [cat, setCat] = useState<number | "all">("all");
   const [search, setSearch] = useState("");
   const { data: categories, reload: reloadCats } = useApi<MenuCategory[]>("/menu/categories", { include_inactive: true });
+  const { data: recipes, reload: reloadRecipes } = useApi<RecipeSummary[]>("/menu/recipes/summary");
+  const recipeById = new Map((recipes ?? []).map((r) => [r.menu_item_id, r]));
+  const [recipeItem, setRecipeItem] = useState<MenuItem | null>(null);
   const { data: items, error, reload } = useApi<MenuItem[]>("/menu/items", { include_inactive: true, search, category_id: cat === "all" ? undefined : cat });
   const [item, setItem] = useState<ItemForm | null>(null);
   const [catForm, setCatForm] = useState<CatForm | null>(null);
@@ -123,7 +127,7 @@ export default function MenuPage() {
             {!items ? <Spinner /> : items.length === 0 ? <Empty message="No menu items." /> : (
               <table className="table-base">
                 <thead>
-                  <tr><th>Code</th><th>Item</th><th>Category</th><th className="text-right">Price</th><th className="text-right">Cost</th><th>Channels</th><th>Available</th><th /></tr>
+                  <tr><th>Code</th><th>Item</th><th>Category</th><th className="text-right">Price</th><th className="text-right">Cost</th><th>Recipe / Food cost</th><th>Channels</th><th>Available</th><th /></tr>
                 </thead>
                 <tbody>
                   {items.map((m) => (
@@ -137,6 +141,20 @@ export default function MenuPage() {
                       <td>{m.category_name}</td>
                       <td className="text-right font-medium">{money(m.price)}</td>
                       <td className="text-right text-slate-500">{money(m.cost_price)}</td>
+                      <td>
+                        {recipeById.get(m.id) ? (
+                          <button className="text-left" onClick={() => setRecipeItem(m)} title="Edit recipe">
+                            <Badge color={(recipeById.get(m.id)!.food_cost_pct ?? 0) > 40 ? "red" : "green"}>
+                              {recipeById.get(m.id)!.food_cost_pct ?? "-"}%
+                            </Badge>
+                            <span className="ml-1 text-xs text-slate-500">{recipeById.get(m.id)!.line_count} ingr.</span>
+                          </button>
+                        ) : (
+                          <button className="text-xs text-slate-400 hover:text-brand-700" onClick={() => setRecipeItem(m)}>
+                            + add recipe
+                          </button>
+                        )}
+                      </td>
                       <td className="space-x-1 whitespace-nowrap">
                         {m.available_dine_in && <Badge color="blue">Dine</Badge>}
                         {m.available_takeaway && <Badge color="purple">Take</Badge>}
@@ -148,6 +166,7 @@ export default function MenuPage() {
                         </button>
                       </td>
                       <td className="whitespace-nowrap text-right">
+                        <button className="btn-ghost btn-sm" onClick={() => setRecipeItem(m)} aria-label="Recipe" title="Recipe"><BookOpenCheck size={14} /></button>
                         <button className="btn-ghost btn-sm" onClick={() => setItem({ ...m })} aria-label="Edit"><Pencil size={14} /></button>
                         <button className="btn-ghost btn-sm text-red-600" onClick={() => del(`/menu/items/${m.id}`, m.name, reload)} aria-label="Delete"><Trash2 size={14} /></button>
                       </td>
@@ -160,6 +179,14 @@ export default function MenuPage() {
         </div>
       </div>
 
+      <RecipeEditor
+        item={recipeItem}
+        onClose={() => setRecipeItem(null)}
+        onSaved={() => {
+          reload();
+          reloadRecipes();
+        }}
+      />
       <Modal open={!!item} onClose={() => setItem(null)} title={item?.id ? "Edit menu item" : "New menu item"} footer={<AsyncButton onClick={saveItem}>Save</AsyncButton>}>
         {item && (
           <div className="grid gap-3 sm:grid-cols-2">

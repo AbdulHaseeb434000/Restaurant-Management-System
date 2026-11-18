@@ -25,6 +25,7 @@ from .models import (
     Payment,
     Purchase,
     PurchaseItem,
+    RecipeLine,
     StockAdjustment,
     StockIssue,
     StockIssueItem,
@@ -85,6 +86,57 @@ SUPPLIERS = [
     ("City Beverages Distributor", "Imran", "0333-7778899"),
     ("Royal Meat Shop", "Bashir", "0345-2223344"),
 ]
+
+# Demo recipes: ingredient quantities for ONE portion (in each ingredient's unit: kg, ltr, dz, pcs ...)
+_OIL = ("Cooking Oil", 0.03)
+_ONION = ("Onions", 0.05)
+_TOMATO = ("Tomatoes", 0.06)
+_GG = ("Ginger Garlic Paste", 0.015)
+_SPICE = [("Salt", 0.005), ("Red Chilli Powder", 0.005), ("Garam Masala", 0.003)]
+RECIPES = {
+    "Chicken Wings (6 pcs)": [("Chicken (with bone)", 0.35), ("Cooking Oil", 0.08), ("Maida", 0.04), *_SPICE[:2]],
+    "Fish Crackers": [("Fish (Rahu)", 0.2), ("Maida", 0.05), ("Cooking Oil", 0.08), *_SPICE[:2]],
+    "Loaded Fries": [("Potatoes", 0.3), ("Cooking Oil", 0.08), ("Cream", 0.04), ("Chicken (boneless)", 0.06), ("Salt", 0.004)],
+    "Chicken Corn Soup": [("Chicken (boneless)", 0.05), ("Eggs", 0.08), ("Maida", 0.02), ("Salt", 0.004)],
+    "Garlic Bread": [("Maida", 0.1), ("Butter", 0.03), _GG],
+    "Chicken Tikka": [("Chicken (with bone)", 0.4), ("Yogurt", 0.06), _GG, ("Lemons", 0.02), *_SPICE, _OIL],
+    "Seekh Kabab (4 pcs)": [("Beef Mince", 0.3), _ONION, _GG, ("Green Chillies", 0.01), *_SPICE],
+    "Malai Boti": [("Chicken (boneless)", 0.3), ("Cream", 0.06), ("Yogurt", 0.04), _GG, ("Salt", 0.004)],
+    "Grilled Fish": [("Fish (Rahu)", 0.45), ("Lemons", 0.03), _GG, *_SPICE, _OIL],
+    "Mixed Grill Platter": [("Chicken (with bone)", 0.4), ("Beef Mince", 0.25), ("Chicken (boneless)", 0.25),
+                            ("Yogurt", 0.08), _GG, *_SPICE, ("Cooking Oil", 0.05)],
+    "Chicken Karahi (Half)": [("Chicken (with bone)", 0.5), ("Tomatoes", 0.25), ("Ghee", 0.06), _GG,
+                              ("Green Chillies", 0.02), *_SPICE, ("Mint & Coriander", 0.01)],
+    "Chicken Karahi (Full)": [("Chicken (with bone)", 1.0), ("Tomatoes", 0.5), ("Ghee", 0.12), ("Ginger Garlic Paste", 0.03),
+                              ("Green Chillies", 0.04), ("Salt", 0.01), ("Red Chilli Powder", 0.01),
+                              ("Garam Masala", 0.006), ("Mint & Coriander", 0.02)],
+    "Mutton Karahi (Half)": [("Mutton", 0.5), ("Tomatoes", 0.25), ("Ghee", 0.07), _GG, ("Green Chillies", 0.02), *_SPICE],
+    "Chicken White Handi": [("Chicken (boneless)", 0.4), ("Cream", 0.1), ("Yogurt", 0.08), ("Butter", 0.02), _GG, ("Salt", 0.005)],
+    "Daal Mash": [("Daal Mash", 0.15), ("Ghee", 0.03), _ONION, _GG, ("Salt", 0.004)],
+    "Chicken Biryani": [("Basmati Rice", 0.18), ("Chicken (with bone)", 0.2), ("Yogurt", 0.04), _ONION, _TOMATO,
+                        _OIL, *_SPICE],
+    "Beef Pulao": [("Basmati Rice", 0.18), ("Beef Mince", 0.15), _ONION, _OIL, ("Salt", 0.005)],
+    "Egg Fried Rice": [("Basmati Rice", 0.15), ("Eggs", 0.17), ("Cooking Oil", 0.02), ("Salt", 0.004)],
+    "Plain Rice": [("Basmati Rice", 0.15), ("Salt", 0.003)],
+    "Zinger Burger": [("Burger Buns", 1), ("Chicken (boneless)", 0.15), ("Maida", 0.04), ("Cooking Oil", 0.06),
+                      ("Takeaway Boxes", 1)],
+    "Beef Smash Burger": [("Burger Buns", 1), ("Beef Mince", 0.18), _ONION, ("Butter", 0.01), ("Takeaway Boxes", 1)],
+    "Chicken Shawarma": [("Pita Bread", 1), ("Chicken (boneless)", 0.12), ("Yogurt", 0.03), _GG, ("Paper Bags", 1)],
+    "Club Sandwich": [("Maida", 0.12), ("Chicken (boneless)", 0.1), ("Eggs", 0.08), ("Butter", 0.02)],
+    "Roti": [("Flour (Atta)", 0.08)],
+    "Naan": [("Maida", 0.12), ("Yogurt", 0.01)],
+    "Garlic Naan": [("Maida", 0.12), ("Butter", 0.015), ("Ginger Garlic Paste", 0.01)],
+    "Paratha": [("Flour (Atta)", 0.1), ("Ghee", 0.02)],
+    "Kheer": [("Milk", 0.25), ("Basmati Rice", 0.03), ("Sugar", 0.04)],
+    "Gulab Jamun (2 pcs)": [("Milk", 0.08), ("Maida", 0.03), ("Sugar", 0.05), ("Ghee", 0.03)],
+    "Chocolate Brownie": [("Maida", 0.05), ("Butter", 0.03), ("Sugar", 0.04), ("Eggs", 0.04)],
+    "Soft Drink (Regular)": [("Soft Drink Cans", 1)],
+    "Soft Drink (1.5L)": [("Soft Drink 1.5L", 1)],
+    "Mineral Water": [("Mineral Water 500ml", 1)],
+    "Fresh Lime": [("Lemons", 0.06), ("Sugar", 0.03)],
+    "Mint Margarita": [("Lemons", 0.05), ("Mint & Coriander", 0.01), ("Sugar", 0.03)],
+    "Doodh Patti Chai": [("Milk", 0.2), ("Tea Leaves", 0.008), ("Sugar", 0.02)],
+}
 
 EXPENSE_CATEGORIES = ["Rent", "Salaries", "Electricity", "Gas", "Water", "Maintenance", "Marketing",
                       "Fuel (Delivery)", "Miscellaneous"]
@@ -179,6 +231,11 @@ def seed_demo(db: Session) -> None:
     suppliers = [Supplier(name=n, contact_person=c, phone=p) for n, c, p in SUPPLIERS]
     db.add_all(suppliers)
     db.flush()
+
+    inv_by_name = {item.name: item for item, _ in inv}
+    for mi in menu_items:
+        for ingredient, q in RECIPES.get(mi.name, []):
+            db.add(RecipeLine(menu_item_id=mi.id, inventory_item_id=inv_by_name[ingredient].id, quantity=Decimal(str(q))))
 
     t0 = today()
     days = 30

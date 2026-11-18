@@ -9,7 +9,17 @@ from .backup import auto_backup_if_due
 from .config import settings
 from .database import SessionLocal
 from .migrate import run_migrations
-from .routers import auth, backup, customers, expenses, inventory, menu, orders, reports, tables
+from .routers import (
+    auth,
+    backup,
+    customers,
+    expenses,
+    inventory,
+    menu,
+    orders,
+    reports,
+    tables,
+)
 from .routers import settings as settings_router
 from .seed import seed
 

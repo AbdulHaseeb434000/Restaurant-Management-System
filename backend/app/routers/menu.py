@@ -1,12 +1,23 @@
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
-from ..models import MenuCategory, MenuItem, OrderItem, User
-from ..schemas import MenuCategoryIn, MenuCategoryOut, MenuItemIn, MenuItemOut
+from ..models import InventoryItem, MenuCategory, MenuItem, OrderItem, RecipeLine, User
+from ..schemas import (
+    MenuCategoryIn,
+    MenuCategoryOut,
+    MenuItemIn,
+    MenuItemOut,
+    RecipeIn,
+    RecipeLineOut,
+    RecipeOut,
+    RecipeSummary,
+)
 from ..security import MANAGERS, get_current_user, require_roles
-from ..utils import commit_or_409, get_or_404
+from ..utils import commit_or_409, get_or_404, q2
 
 router = APIRouter(prefix="/api/menu", tags=["menu"])
 
@@ -142,3 +153,77 @@ def delete_item(item_id: int, db: Session = Depends(get_db), _: User = Depends(r
     else:
         db.delete(item)
     commit_or_409(db)
+
+
+# ---------------------------------------------------------------- recipes (ingredients per portion)
+
+def _food_cost_pct(cost: Decimal, price: Decimal) -> Decimal | None:
+    return q2(cost * 100 / price) if price else None
+
+
+def _recipe_out(db: Session, item: MenuItem) -> RecipeOut:
+    rows = db.scalars(
+        select(RecipeLine)
+        .where(RecipeLine.menu_item_id == item.id)
+        .options(joinedload(RecipeLine.inventory_item).joinedload(InventoryItem.unit))
+        .order_by(RecipeLine.id)
+    ).all()
+    lines, total = [], Decimal(0)
+    for r in rows:
+        inv = r.inventory_item
+        cost = Decimal(r.quantity) * Decimal(inv.avg_cost or 0)
+        total += cost
+        lines.append(
+            RecipeLineOut(
+                inventory_item_id=inv.id, item_name=inv.name, unit_name=inv.unit.abbreviation if inv.unit else "",
+                quantity=r.quantity, unit_cost=inv.avg_cost, line_cost=q2(cost), is_active=inv.is_active,
+            )
+        )
+    return RecipeOut(
+        menu_item_id=item.id, menu_item_name=item.name, price=item.price, recipe_cost=q2(total),
+        food_cost_pct=_food_cost_pct(total, Decimal(item.price)), lines=lines,
+    )
+
+
+@router.get("/recipes/summary", response_model=list[RecipeSummary])
+def recipes_summary(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    rows = db.execute(
+        select(RecipeLine.menu_item_id, func.count(RecipeLine.id),
+               func.sum(RecipeLine.quantity * InventoryItem.avg_cost), MenuItem.price)
+        .join(InventoryItem, InventoryItem.id == RecipeLine.inventory_item_id)
+        .join(MenuItem, MenuItem.id == RecipeLine.menu_item_id)
+        .group_by(RecipeLine.menu_item_id, MenuItem.price)
+    ).all()
+    return [
+        RecipeSummary(menu_item_id=r[0], line_count=r[1], recipe_cost=q2(r[2] or 0),
+                      food_cost_pct=_food_cost_pct(Decimal(r[2] or 0), Decimal(r[3])))
+        for r in rows
+    ]
+
+
+@router.get("/items/{item_id}/recipe", response_model=RecipeOut)
+def get_recipe(item_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    return _recipe_out(db, get_or_404(db, MenuItem, item_id, "Menu item"))
+
+
+@router.put("/items/{item_id}/recipe", response_model=RecipeOut)
+def save_recipe(
+    item_id: int, data: RecipeIn, db: Session = Depends(get_db), _: User = Depends(require_roles(*MANAGERS))
+):
+    item = get_or_404(db, MenuItem, item_id, "Menu item")
+    merged: dict[int, Decimal] = {}
+    for line in data.lines:  # same ingredient twice -> add the quantities
+        merged[line.inventory_item_id] = merged.get(line.inventory_item_id, Decimal(0)) + line.quantity
+    if merged:
+        found = set(db.scalars(select(InventoryItem.id).where(InventoryItem.id.in_(merged))))
+        missing = set(merged) - found
+        if missing:
+            raise HTTPException(status_code=400, detail=f"Unknown inventory item(s): {sorted(missing)}")
+    db.execute(delete(RecipeLine).where(RecipeLine.menu_item_id == item.id))
+    db.add_all(RecipeLine(menu_item_id=item.id, inventory_item_id=i, quantity=q) for i, q in merged.items())
+    db.flush()
+    out = _recipe_out(db, item)
+    if merged:
+        item.cost_price = q2(out.recipe_cost)  # keep the menu's cost/margin in step with the recipe
+    commit_or_409(db)
+    return out

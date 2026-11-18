@@ -1,6 +1,6 @@
 # Restaurant Management System
 
-A restaurant management app for dine-in, take-away and delivery. It covers a POS, table management, a kitchen display, menu management, ingredient inventory (purchases and store-to-kitchen issues) and 23 business reports.
+A restaurant management app for dine-in, take-away and delivery. It covers a POS, table management, a kitchen display, menu management, ingredient inventory (purchases and store-to-kitchen issues) and 25 business reports.
 
 **Stack:** FastAPI + SQLAlchemy 2 (Python 3.11), PostgreSQL 16 and Next.js 15 (React 19, TypeScript, Tailwind CSS, Recharts).
 
@@ -24,6 +24,8 @@ A restaurant management app for dine-in, take-away and delivery. It covers a POS
 | **Menu management** | Categories (sort order, active flag) and items with price, estimated cost, code, description and per-channel availability (dine-in / take-away / delivery). Toggle items out of stock ("86") instantly. |
 | **Inventory items** | Ingredients with SKU, category, unit of measure and reorder level. Stock is tracked separately for **store** and **kitchen**, at weighted-average cost. |
 | **Purchases (GRN)** | Receive goods from a supplier with multiple lines. This adds to store stock and updates the average cost. Tracks paid / balance due per supplier. A purchase can be cancelled (stock reversed) if its stock has not been issued yet. |
+| **Inventory method (Settings)** | A manager/admin chooses how ingredient usage is recorded and can switch any time: **Store → Kitchen issue** (food cost = value issued to the kitchen; sales don't touch stock) or **Recipe mapping** (completing an order deducts each dish's recipe automatically, from **kitchen** or **store** stock). Voided items are not deducted; reopening an order puts its stock back. Sales are never blocked by low stock (it can go negative, flagging missing purchases/issues). |
+| **Recipes** | Menu Management → *Recipe* on any dish: ingredients and quantity per portion, with live recipe cost, margin and food cost %. Saving updates the dish's estimated cost. Recipes can be prepared before recipe mode is switched on. |
 | **Store → Kitchen issue** | Move stock from store to kitchen at average cost. Issuing more than is in store is blocked. |
 | **Adjustments / wastage** | Wastage, damage, kitchen consumption (closing count), count corrections and opening stock. |
 | **Stock overview & ledger** | Current stock and its value, a low-stock filter, and an immutable movement ledger with running balance. |
@@ -32,16 +34,16 @@ A restaurant management app for dine-in, take-away and delivery. It covers a POS
 | **Users & roles** | admin, manager, cashier, waiter, kitchen, storekeeper. Every API endpoint and every screen is role-checked. |
 | **Settings** | Restaurant name, address and phone for receipts, currency, tax %, dine-in service charge %, default delivery fee and receipt footer. |
 
-### Reports (23)
+### Reports (25)
 Each report runs for any date range and has a chart, totals, CSV export and print.
 
 **Sales:** Day-End (Z) Summary (cashiers can run it too; it shows collections by method and expected cash in the drawer) · Daily Sales Summary · Sales by Order Type · Item-wise Sales · Category-wise Sales · Hourly Sales (peak hours) · Day-of-Week Sales · Payment Method Summary · Discount Report · Cancelled Orders & Voided Items · Table Performance (covers, avg/cover, seating time) · Staff Sales Performance · Top Customers · Delivery Report (per rider) · Non-Selling Menu Items
 
-**Inventory:** Purchases by Supplier · Item-wise Purchases (min/max/avg price) · Store-to-Kitchen Issues · Current Stock & Valuation · Low Stock / Reorder List (suggested qty & cost) · Wastage & Adjustments
+**Inventory:** Menu Costing & Profitability (recipe cost, margin, food cost % per dish) · Ingredient Usage Variance (expected use from recipes vs issued/deducted) · Purchases by Supplier · Item-wise Purchases (min/max/avg price) · Store-to-Kitchen Issues · Current Stock & Valuation · Low Stock / Reorder List (suggested qty & cost) · Wastage & Adjustments
 
 **Finance:** Expenses by Category · Profit & Loss Summary
 
-> Because recipe mapping is not built yet, **food cost = value issued from store to kitchen** in the P&L.
+> In the P&L, **food cost follows the inventory method**: value issued from store to kitchen, or the recipe cost of the dishes sold.
 
 The **dashboard** shows today's sales, average order value, open orders, table occupancy, kitchen queue, active deliveries, low-stock count, a 7-day sales chart, the order-type split, collections and top items.
 
@@ -179,5 +181,4 @@ frontend/
 ```
 
 ## Not included yet (next phases)
-- Recipe / BOM mapping with automatic ingredient deduction per sale
 - Shift / cash-drawer closing, purchase orders before GRN, multi-branch

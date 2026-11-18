@@ -19,6 +19,34 @@ export interface AppSettings {
   service_charge_rate: number;
   default_delivery_fee: number;
   receipt_footer: string;
+  inventory_mode: "issue" | "recipe";
+  recipe_stock_location: "kitchen" | "store";
+}
+
+export interface RecipeLine {
+  inventory_item_id: number;
+  item_name: string;
+  unit_name: string;
+  quantity: number;
+  unit_cost: number;
+  line_cost: number;
+  is_active: boolean;
+}
+
+export interface Recipe {
+  menu_item_id: number;
+  menu_item_name: string;
+  price: number;
+  recipe_cost: number;
+  food_cost_pct: number | null;
+  lines: RecipeLine[];
+}
+
+export interface RecipeSummary {
+  menu_item_id: number;
+  line_count: number;
+  recipe_cost: number;
+  food_cost_pct: number | null;
 }
 
 export interface MenuCategory {

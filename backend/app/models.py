@@ -10,6 +10,8 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
+    false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -53,6 +55,11 @@ class AppSetting(Base):
     service_charge_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=0)
     default_delivery_fee: Mapped[Decimal] = mapped_column(Money, default=0)
     receipt_footer: Mapped[str] = mapped_column(String(255), default="Thank you for dining with us!")
+    # How ingredient consumption is recorded:
+    #   "issue"  - store-to-kitchen issues are the food cost (no automatic deduction)
+    #   "recipe" - completing an order deducts each dish's recipe from recipe_stock_location
+    inventory_mode: Mapped[str] = mapped_column(String(20), default="issue", server_default="issue")
+    recipe_stock_location: Mapped[str] = mapped_column(String(20), default="kitchen", server_default="kitchen")
 
 
 # --------------------------------------------------------------------------- menu
@@ -160,6 +167,8 @@ class Order(TimestampMixin, Base):
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     kot_counter: Mapped[int] = mapped_column(Integer, default=0)
+    # True while this order's recipe ingredients are deducted from stock (recipe mode)
+    stock_deducted: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
     table: Mapped[DiningTable | None] = relationship()
     customer: Mapped[Customer | None] = relationship()
@@ -189,6 +198,8 @@ class OrderItem(TimestampMixin, Base):
     kot_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancel_reason: Mapped[str] = mapped_column(String(255), default="")
+    # ingredient cost of this line, recorded when the recipe was deducted (recipe mode)
+    cost_amount: Mapped[Decimal] = mapped_column(Money, default=0, server_default="0")
 
     order: Mapped[Order] = relationship(back_populates="items")
     menu_item: Mapped[MenuItem] = relationship()
@@ -370,6 +381,21 @@ class StockMovement(TimestampMixin, Base):
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     item: Mapped[InventoryItem] = relationship()
+
+
+class RecipeLine(Base):
+    """Ingredient quantity used for ONE portion of a menu item."""
+
+    __tablename__ = "recipe_lines"
+    __table_args__ = (UniqueConstraint("menu_item_id", "inventory_item_id", name="uq_recipe_menu_inventory"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    menu_item_id: Mapped[int] = mapped_column(ForeignKey("menu_items.id", ondelete="CASCADE"), index=True)
+    inventory_item_id: Mapped[int] = mapped_column(ForeignKey("inventory_items.id"), index=True)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 4))
+
+    menu_item: Mapped[MenuItem] = relationship()
+    inventory_item: Mapped[InventoryItem] = relationship()
 
 
 # --------------------------------------------------------------------------- expenses

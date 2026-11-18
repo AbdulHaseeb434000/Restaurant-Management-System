@@ -7,6 +7,7 @@ import LineEditor, { EditableLine, validLines } from "@/components/LineEditor";
 import { Empty, ErrorBox, Field, Modal, PageHeader, Spinner, useToast } from "@/components/ui";
 import ExportButton from "@/components/ExportButton";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { dateOnly, daysAgo, isoDate, money, qty } from "@/lib/format";
 import { issuesSheets } from "@/lib/exports";
 import { useApi } from "@/lib/hooks";
@@ -22,6 +23,7 @@ export default function IssuesPage() {
 
 function Issues() {
   const toast = useToast();
+  const { settings } = useAuth();
   const params = useSearchParams();
   const [dateFrom, setDateFrom] = useState(daysAgo(7));
   const [dateTo, setDateTo] = useState(isoDate());
@@ -69,6 +71,11 @@ function Issues() {
   return (
     <div>
       <PageHeader title="Store → Kitchen Issues" subtitle={`${data?.length ?? 0} issues · ${money(total)} issued`} actions={<><ExportButton filename="Kitchen_issues" sheets={() => issuesSheets(data ?? [])} disabled={!data?.length} /><button className="btn-primary" onClick={openNew}><Plus size={16} /> New issue</button></>} />
+      {settings?.inventory_mode === "recipe" && settings.recipe_stock_location === "store" && (
+        <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+          Recipe mapping deducts ingredients straight from <b>store</b> stock (Settings → Inventory method), so issuing to the kitchen is optional.
+        </div>
+      )}
       <div className="card mb-4 flex flex-wrap gap-3 p-3">
         <input className="input w-auto" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="From" />
         <input className="input w-auto" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} aria-label="To" />

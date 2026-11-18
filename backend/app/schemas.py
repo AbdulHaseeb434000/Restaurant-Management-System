@@ -65,6 +65,8 @@ class SettingsBase(BaseModel):
     service_charge_rate: NonNegNum = Decimal(0)
     default_delivery_fee: NonNegNum = Decimal(0)
     receipt_footer: str = ""
+    inventory_mode: Literal["issue", "recipe"] = "issue"
+    recipe_stock_location: Literal["kitchen", "store"] = "kitchen"
 
 
 class SettingsOut(SettingsBase, ORM):
@@ -101,6 +103,41 @@ class MenuItemIn(BaseModel):
 class MenuItemOut(MenuItemIn, ORM):
     id: int
     category_name: str = ""
+
+
+class RecipeLineIn(BaseModel):
+    inventory_item_id: int
+    quantity: PosNum  # per one portion, in the ingredient's unit
+
+
+class RecipeIn(BaseModel):
+    lines: list[RecipeLineIn] = []
+
+
+class RecipeLineOut(BaseModel):
+    inventory_item_id: int
+    item_name: str
+    unit_name: str
+    quantity: Num
+    unit_cost: Num
+    line_cost: Num
+    is_active: bool
+
+
+class RecipeOut(BaseModel):
+    menu_item_id: int
+    menu_item_name: str
+    price: Num
+    recipe_cost: Num
+    food_cost_pct: Num | None
+    lines: list[RecipeLineOut]
+
+
+class RecipeSummary(BaseModel):
+    menu_item_id: int
+    line_count: int
+    recipe_cost: Num
+    food_cost_pct: Num | None
 
 
 # --------------------------------------------------------------------------- tables
